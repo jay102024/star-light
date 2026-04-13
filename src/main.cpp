@@ -29,30 +29,34 @@ constexpr uint8_t ALERT_BREATH_MIN = 0;
 constexpr uint8_t ALERT_BREATH_MAX = 225;
 
 const CRGB COLOR_PALETTE[] = {
-  CRGB::Red,
-  CRGB::Blue,
-  CRGB::Green,
-  CRGB::Purple,
-  CRGB::Aqua,
-  CRGB::Orange,
-  CRGB::Pink,
-  CRGB::White,
-  CRGB::Cyan,
-  CRGB::Magenta,
-  CRGB::Gold,
-  CRGB::DeepPink,
-  CRGB::DarkTurquoise,
-  CRGB::LawnGreen,
-  CRGB::Coral,
-  CRGB::HotPink,
-  CRGB::DodgerBlue,
-  CRGB::Tomato,
+  CRGB::Lavender,
+  CRGB::LightPink,
+  CRGB::PaleTurquoise,
+  CRGB::PowderBlue,
+  CRGB::Thistle,
+  CRGB::Violet,
+  CRGB::CornflowerBlue,
+  CRGB::MediumAquamarine,
+  CRGB::Orchid,
+  CRGB::SteelBlue,
   CRGB::MediumPurple,
-  CRGB::Chartreuse,
-  CRGB::Turquoise
+  CRGB::Coral,
+  CRGB::SkyBlue,
+  CRGB::LightSeaGreen,
+  CRGB::MediumSlateBlue,
+  CRGB::Aquamarine,
+  CRGB::Pink,
+  CRGB::Turquoise,
+  CRGB::Plum,
+  CRGB::DarkTurquoise
 };
 
 const size_t COLOR_COUNT = sizeof(COLOR_PALETTE) / sizeof(COLOR_PALETTE[0]);
+
+size_t colorOrder[COLOR_COUNT];
+size_t colorOrderPos = COLOR_COUNT;  // 初始值 == COLOR_COUNT，觸發第一次 shuffle
+size_t lastColorIdx = COLOR_COUNT;   // 哨兵：尚無上一個顏色
+CRGB  currentDisplayColor = CRGB::Black;
 
 const char INDEX_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
@@ -107,15 +111,24 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 
     .count {
       margin: 24px 0;
+      display: inline-flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 6px;
       font-size: 4rem;
       font-weight: 700;
       color: #60a5fa;
     }
 
-    .target-display {
-      margin-top: 8px;
+    .count-current {
+      line-height: 1;
+    }
+
+    .count-target {
       color: #bfdbfe;
-      font-size: 0.98rem;
+      font-size: 1.2rem;
+      line-height: 1.1;
+      transform: translateY(-0.2rem);
     }
 
     .actions {
@@ -183,16 +196,14 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 
   <main id="appScreen" class="card hidden">
     <h1>目前人數</h1>
-    <div id="count" class="count">0</div>
-    <div id="targetDisplay" class="target-display">目標人數：0</div>
+    <div class="count">
+      <span id="count" class="count-current">0</span>
+      <span id="targetDisplay" class="count-target">/0</span>
+    </div>
     <div class="actions">
       <button id="incrementButton" class="button" type="button">+1</button>
       <button id="decrementButton" class="button" type="button">-1</button>
       <button id="resetButton" class="button" type="button">歸零</button>
-    </div>
-    <div class="target-row">
-      <input id="targetInput" type="number" min="0" step="1" placeholder="輸入目標人數">
-      <button id="setTargetButton" class="button" type="button">設定</button>
     </div>
   </main>
 
@@ -202,8 +213,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 
     function updateUi(state) {
       document.getElementById('count').textContent = state.count;
-      document.getElementById('targetDisplay').textContent = `目標人數：${state.target}`;
-      document.getElementById('targetInput').value = state.target;
+      document.getElementById('targetDisplay').textContent = `/${state.target}`;
       if (!hasEnteredApp) {
         document.getElementById('welcomeTargetInput').value = state.target > 0 ? state.target : '';
       }
@@ -259,10 +269,6 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     document.getElementById('incrementButton').addEventListener('click', () => postAction('/increment'));
     document.getElementById('decrementButton').addEventListener('click', () => postAction('/decrement'));
     document.getElementById('resetButton').addEventListener('click', () => postAction('/reset'));
-    document.getElementById('setTargetButton').addEventListener('click', () => {
-      const target = document.getElementById('targetInput').value || '0';
-      postAction('/set-target', `target=${encodeURIComponent(target)}`);
-    });
 
     fetchState();
   </script>
@@ -280,13 +286,29 @@ void showSolid(const CRGB& color) {
   FastLED.show();
 }
 
-CRGB colorForCounter(unsigned long value) {
-  if (value == 0) {
-    return CRGB::Black;
+void shuffleColorOrder() {
+  for (size_t i = 0; i < COLOR_COUNT; i++) colorOrder[i] = i;
+  for (size_t i = COLOR_COUNT - 1; i > 0; i--) {
+    const size_t j = random(i + 1);
+    const size_t tmp = colorOrder[i];
+    colorOrder[i] = colorOrder[j];
+    colorOrder[j] = tmp;
   }
+  // 避免重洗後第一個顏色與上一個相同
+  if (lastColorIdx < COLOR_COUNT && colorOrder[0] == lastColorIdx && COLOR_COUNT > 1) {
+    const size_t tmp = colorOrder[0];
+    colorOrder[0] = colorOrder[1];
+    colorOrder[1] = tmp;
+  }
+  colorOrderPos = 0;
+}
 
-  const size_t index = (value - 1) % COLOR_COUNT;
-  return COLOR_PALETTE[index];
+CRGB nextRandomColor() {
+  if (colorOrderPos >= COLOR_COUNT) {
+    shuffleColorOrder();
+  }
+  lastColorIdx = colorOrder[colorOrderPos++];
+  return COLOR_PALETTE[lastColorIdx];
 }
 
 void startTargetAlert() {
@@ -299,7 +321,7 @@ void startTargetAlert() {
 }
 
 void renderBaseColor() {
-  showSolid(colorForCounter(counter));
+  showSolid(currentDisplayColor);
 }
 
 bool hasReachedTarget() {
@@ -344,6 +366,7 @@ void applyCounterChange(unsigned long newValue, const char* reason) {
         targetAlertActive = false;
         FastLED.setBrightness(80);
       }
+    currentDisplayColor = (counter == 0) ? CRGB::Black : nextRandomColor();
     renderBaseColor();
   }
 
