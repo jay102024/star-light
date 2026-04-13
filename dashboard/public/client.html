@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Counter Client</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body class="client-body">
+  <main class="shell client-shell">
+    <section class="hero hero-client">
+      <p class="eyebrow">Client Zone</p>
+      <h1>先選自己的隊伍，再進入計數器</h1>
+      <p class="hero-copy">各桌長只需要進到這個頁面，選到自己的桌次，就可以即時加減人數。</p>
+    </section>
+
+    <section id="teamPicker" class="panel chooser-panel">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">Pick Team</p>
+          <h2>選擇桌次</h2>
+        </div>
+      </div>
+      <div class="team-grid selectable-grid" id="teamPickerGrid"></div>
+    </section>
+
+    <section id="counterPanel" class="panel counter-panel hidden">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow" id="selectedTeamLabel">Current Team</p>
+          <h2 id="selectedTeamName">第 1 桌</h2>
+        </div>
+        <button id="changeTeamButton" class="ghost-button" type="button">切換桌次</button>
+      </div>
+
+      <div class="counter-card">
+        <div class="counter-number">
+          <span id="countValue" class="counter-current">0</span>
+          <span id="targetValue" class="counter-target">/0</span>
+        </div>
+        <p id="teamStatus" class="counter-status">尚未設定目標人數</p>
+      </div>
+
+      <div class="counter-actions">
+        <button id="decrementButton" class="action-button danger" type="button">-1</button>
+        <button id="incrementButton" class="action-button" type="button">+1</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/assets/client.js"></script>
+</body>
+</html>

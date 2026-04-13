@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WebServer.h>
+#include <HTTPClient.h>
 #include <FastLED.h>
 
 #define SENSOR_PIN 1  // KY-010 光遮斷傳感器的輸出腳位
@@ -11,13 +12,26 @@
 CRGB leds[NUM_LEDS];
 
 namespace {
-const char* AP_SSID = "ESP32-Counter";
-const char* AP_PASSWORD = "12345678";
+const char* WIFI_SSID = "counter";
+const char* WIFI_PASSWORD = "88888888";
+const char* SERVER_BASE_URL = "http://192.168.66.101:3000";
+const char* TEAM_ID = "team-1";
+const char* DEVICE_ID = "esp32-table-1";
 
 WebServer server(80);
 volatile unsigned long counter = 0;
 int targetCount = 0;
 int lastSensorState = HIGH;
+unsigned long lastHeartbeatMs = 0;
+unsigned long lastWifiRetryMs = 0;
+unsigned long lastRemoteSyncMs = 0;
+unsigned long testLightEndMs = 0;
+long lastTestLightSeq = 0;
+
+constexpr unsigned long WIFI_RETRY_INTERVAL_MS = 5000;
+constexpr unsigned long HEARTBEAT_INTERVAL_MS = 5000;
+constexpr unsigned long REMOTE_SYNC_INTERVAL_MS = 1200;
+constexpr unsigned long TEST_LIGHT_DURATION_MS = 1200;
 
 bool targetAlertActive = false;
 uint8_t alertBreathBrightness = 80;
@@ -277,8 +291,152 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 )rawliteral";
 }  // namespace
 
+void startTargetAlert();
+void renderBaseColor();
+CRGB nextRandomColor();
+void renderCurrentLedState();
+void triggerTestLight();
+void refreshTestLight();
+
 String stateJson() {
   return "{\"count\":" + String(counter) + ",\"target\":" + String(targetCount) + "}";
+}
+
+void ensureWifiConnected() {
+  if (WiFi.status() == WL_CONNECTED) {
+    return;
+  }
+
+  const unsigned long now = millis();
+  if (now - lastWifiRetryMs < WIFI_RETRY_INTERVAL_MS) {
+    return;
+  }
+
+  lastWifiRetryMs = now;
+  Serial.println("Wi-Fi disconnected, retrying...");
+  WiFi.disconnect();
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+}
+
+long extractJsonLong(const String& json, const char* key, long defaultValue) {
+  const String pattern = String("\"") + key + "\":";
+  const int start = json.indexOf(pattern);
+  if (start < 0) {
+    return defaultValue;
+  }
+
+  int valueStart = start + pattern.length();
+  while (valueStart < static_cast<int>(json.length()) &&
+         (json[valueStart] == ' ' || json[valueStart] == '\t')) {
+    valueStart++;
+  }
+
+  int valueEnd = valueStart;
+  while (valueEnd < static_cast<int>(json.length()) &&
+         (json[valueEnd] == '-' || (json[valueEnd] >= '0' && json[valueEnd] <= '9'))) {
+    valueEnd++;
+  }
+
+  if (valueEnd == valueStart) {
+    return defaultValue;
+  }
+
+  return json.substring(valueStart, valueEnd).toInt();
+}
+
+void applyRemoteState(unsigned long newCount, int newTarget) {
+  const unsigned long previous = counter;
+  counter = newCount;
+  targetCount = newTarget < 0 ? 0 : newTarget;
+
+  if (targetCount > 0 && counter == static_cast<unsigned long>(targetCount) && previous != counter) {
+    startTargetAlert();
+  } else {
+    if (counter != static_cast<unsigned long>(targetCount)) {
+      targetAlertActive = false;
+      FastLED.setBrightness(80);
+    }
+    currentDisplayColor = (counter == 0) ? CRGB::Black : nextRandomColor();
+    renderCurrentLedState();
+  }
+
+  Serial.print("Remote sync -> Count: ");
+  Serial.print(counter);
+  Serial.print(" / Target: ");
+  Serial.println(targetCount);
+}
+
+void fetchRemoteState(bool forceNow = false) {
+  const unsigned long now = millis();
+  if (!forceNow && now - lastRemoteSyncMs < REMOTE_SYNC_INTERVAL_MS) {
+    return;
+  }
+
+  if (WiFi.status() != WL_CONNECTED) {
+    return;
+  }
+
+  lastRemoteSyncMs = now;
+
+  HTTPClient http;
+  const String url = String(SERVER_BASE_URL) + "/api/teams/" + TEAM_ID + "/state";
+  http.begin(url);
+  const int statusCode = http.GET();
+  if (statusCode < 200 || statusCode >= 300) {
+    http.end();
+    return;
+  }
+
+  const String body = http.getString();
+  http.end();
+
+  const long syncedCount = extractJsonLong(body, "count", static_cast<long>(counter));
+  const long syncedTarget = extractJsonLong(body, "target", static_cast<long>(targetCount));
+  const long syncedTestLightSeq = extractJsonLong(body, "testLightSeq", lastTestLightSeq);
+
+  if (syncedTestLightSeq > lastTestLightSeq) {
+    lastTestLightSeq = syncedTestLightSeq;
+    triggerTestLight();
+  }
+
+  if (syncedCount < 0) {
+    return;
+  }
+
+  if (static_cast<unsigned long>(syncedCount) != counter || static_cast<int>(syncedTarget) != targetCount) {
+    applyRemoteState(static_cast<unsigned long>(syncedCount), static_cast<int>(syncedTarget));
+  }
+}
+
+void sendHeartbeat(bool forceNow = false, bool includeCount = false) {
+  const unsigned long now = millis();
+  if (!forceNow && now - lastHeartbeatMs < HEARTBEAT_INTERVAL_MS) {
+    return;
+  }
+
+  if (WiFi.status() != WL_CONNECTED) {
+    return;
+  }
+
+  lastHeartbeatMs = now;
+
+  HTTPClient http;
+  const String url = String(SERVER_BASE_URL) + "/api/devices/heartbeat";
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+
+  const String payload =
+      String("{\"teamId\":\"") + TEAM_ID +
+      "\",\"deviceId\":\"" + DEVICE_ID +
+      (includeCount ? String("\",\"count\":") + String(counter) : String()) +
+      "}";
+
+  const int statusCode = http.POST(payload);
+  if (statusCode < 200 || statusCode >= 300) {
+    Serial.print("Heartbeat failed, status: ");
+    Serial.println(statusCode);
+  }
+  http.end();
 }
 
 void showSolid(const CRGB& color) {
@@ -324,11 +482,52 @@ void renderBaseColor() {
   showSolid(currentDisplayColor);
 }
 
+void renderCurrentLedState() {
+  if (testLightEndMs > millis()) {
+    FastLED.setBrightness(220);
+    showSolid(CRGB::White);
+    return;
+  }
+
+  if (targetAlertActive) {
+    FastLED.setBrightness(alertBreathBrightness);
+    showSolid(CRGB::Yellow);
+    return;
+  }
+
+  FastLED.setBrightness(80);
+  renderBaseColor();
+}
+
+void triggerTestLight() {
+  testLightEndMs = millis() + TEST_LIGHT_DURATION_MS;
+  Serial.println("Test light triggered");
+  renderCurrentLedState();
+}
+
+void refreshTestLight() {
+  if (testLightEndMs == 0) {
+    return;
+  }
+
+  const unsigned long now = millis();
+  if (now < testLightEndMs) {
+    return;
+  }
+
+  testLightEndMs = 0;
+  renderCurrentLedState();
+}
+
 bool hasReachedTarget() {
   return targetCount > 0 && counter >= static_cast<unsigned long>(targetCount);
 }
 
 void refreshTargetAlert() {
+  if (testLightEndMs > millis()) {
+    return;
+  }
+
   if (!targetAlertActive) {
     return;
   }
@@ -367,12 +566,14 @@ void applyCounterChange(unsigned long newValue, const char* reason) {
         FastLED.setBrightness(80);
       }
     currentDisplayColor = (counter == 0) ? CRGB::Black : nextRandomColor();
-    renderBaseColor();
+    renderCurrentLedState();
   }
 
   Serial.print(reason);
   Serial.print(" -> Count: ");
   Serial.println(counter);
+
+  sendHeartbeat(true, true);
 }
 
 void handleRoot() {
@@ -431,7 +632,20 @@ void setup() {
   delay(10);
   lastSensorState = digitalRead(SENSOR_PIN);
 
-  WiFi.softAP(AP_SSID, AP_PASSWORD);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  Serial.println();
+  Serial.print("Connecting to Wi-Fi: ");
+  Serial.println(WIFI_SSID);
+
+  unsigned long wifiStartMs = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - wifiStartMs < 15000) {
+    delay(300);
+    Serial.print(".");
+  }
+
+  Serial.println();
 
   server.on("/", handleRoot);
   server.on("/state", handleState);
@@ -441,19 +655,29 @@ void setup() {
   server.on("/set-target", HTTP_POST, handleSetTarget);
   server.begin();
 
-  Serial.println();
-  Serial.println("Wi-Fi AP started");
-  Serial.print("SSID: ");
-  Serial.println(AP_SSID);
-  Serial.print("Password: ");
-  Serial.println(AP_PASSWORD);
-  Serial.print("Open: http://");
-  Serial.println(WiFi.softAPIP());
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("Wi-Fi connected");
+    Serial.print("ESP32 IP: http://");
+    Serial.println(WiFi.localIP());
+    Serial.print("Central host: ");
+    Serial.println(SERVER_BASE_URL);
+    Serial.print("Team ID: ");
+    Serial.println(TEAM_ID);
+    sendHeartbeat(true, true);
+    fetchRemoteState(true);
+  } else {
+    Serial.println("Wi-Fi connection failed");
+    Serial.println("Please check SSID/password or router signal.");
+  }
 }
 
 void loop() {
   server.handleClient();
+  refreshTestLight();
   refreshTargetAlert();
+  ensureWifiConnected();
+  sendHeartbeat(false, false);
+  fetchRemoteState(false);
 
   const int sensorState = digitalRead(SENSOR_PIN);
 

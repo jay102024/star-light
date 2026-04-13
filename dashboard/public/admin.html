@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Counter Admin</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body class="admin-body">
+  <main class="shell admin-shell">
+    <section class="hero hero-admin">
+      <p class="eyebrow">Admin Console</p>
+      <h1>各桌連線與完成狀態</h1>
+      <p class="hero-copy">這個頁面只透過特殊網址進入。用來查看所有設備是否在線、各桌進度，並設定每桌目標人數。</p>
+      <div class="summary-grid" id="summaryGrid"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">Live Teams</p>
+          <h2>桌次總覽</h2>
+        </div>
+        <button id="resetAllButton" class="danger-button" type="button">全部歸零</button>
+      </div>
+      <div class="team-grid" id="teamGrid"></div>
+    </section>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/assets/admin.js"></script>
+</body>
+</html>
