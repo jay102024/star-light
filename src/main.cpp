@@ -24,39 +24,35 @@ uint8_t alertBreathBrightness = 80;
 bool alertBreathGoingUp = true;
 unsigned long alertBreathLastStepMs = 0;
 
-constexpr unsigned long ALERT_BREATH_STEP_MS = 20;
-constexpr uint8_t ALERT_BREATH_MIN = 0;
-constexpr uint8_t ALERT_BREATH_MAX = 225;
+unsigned long alertBreathStepMs = 20;
+uint8_t alertBreathMin = 0;
+uint8_t alertBreathMax = 225;
 
 const CRGB COLOR_PALETTE[] = {
-  CRGB::Lavender,
-  CRGB::LightPink,
-  CRGB::PaleTurquoise,
-  CRGB::PowderBlue,
-  CRGB::Thistle,
-  CRGB::Violet,
-  CRGB::CornflowerBlue,
-  CRGB::MediumAquamarine,
-  CRGB::Orchid,
-  CRGB::SteelBlue,
-  CRGB::MediumPurple,
-  CRGB::Coral,
-  CRGB::SkyBlue,
-  CRGB::LightSeaGreen,
-  CRGB::MediumSlateBlue,
-  CRGB::Aquamarine,
+  CRGB::Red,
+  CRGB::Blue,
+  CRGB::Green,
+  CRGB::Purple,
+  CRGB::Aqua,
+  CRGB::Orange,
   CRGB::Pink,
-  CRGB::Turquoise,
-  CRGB::Plum,
-  CRGB::DarkTurquoise
+  CRGB::White,
+  CRGB::Cyan,
+  CRGB::Magenta,
+  CRGB::Gold,
+  CRGB::DeepPink,
+  CRGB::DarkTurquoise,
+  CRGB::LawnGreen,
+  CRGB::Coral,
+  CRGB::HotPink,
+  CRGB::DodgerBlue,
+  CRGB::Tomato,
+  CRGB::MediumPurple,
+  CRGB::Chartreuse,
+  CRGB::Turquoise
 };
 
 const size_t COLOR_COUNT = sizeof(COLOR_PALETTE) / sizeof(COLOR_PALETTE[0]);
-
-size_t colorOrder[COLOR_COUNT];
-size_t colorOrderPos = COLOR_COUNT;  // 初始值 == COLOR_COUNT，觸發第一次 shuffle
-size_t lastColorIdx = COLOR_COUNT;   // 哨兵：尚無上一個顏色
-CRGB  currentDisplayColor = CRGB::Black;
 
 const char INDEX_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
@@ -73,21 +69,24 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 
     body {
       margin: 0;
-      min-height: 100vh;
+      min-height: 100dvh;
       display: grid;
       place-items: center;
       background: linear-gradient(135deg, #111827, #1f2937);
       color: #f9fafb;
+      padding: 12px;
+      box-sizing: border-box;
     }
 
     .card {
-      width: min(90vw, 420px);
+      width: min(100%, 420px);
       padding: 32px;
       border-radius: 24px;
       background: rgba(255, 255, 255, 0.08);
       box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
       text-align: center;
       backdrop-filter: blur(10px);
+      box-sizing: border-box;
     }
 
     .hidden {
@@ -95,7 +94,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     }
 
     .welcome {
-      width: min(92vw, 460px);
+      width: min(100%, 460px);
     }
 
     h1 {
@@ -173,6 +172,42 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       color: #d1d5db;
       line-height: 1.6;
     }
+    .tab-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; }
+    .tab-btn { border: none; border-radius: 10px; padding: 10px 0; font-size: 0.95rem; font-weight: 600; color: #9ca3af; background: rgba(255,255,255,0.06); cursor: pointer; transition: all 0.15s; width: 100%; }
+    .tab-btn.active { color: #f9fafb; background: linear-gradient(135deg, #7c3aed, #6d28d9); }
+    .swatch-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 12px 0; }
+    .swatch { aspect-ratio: 1; border-radius: 8px; border: 3px solid transparent; cursor: pointer; transition: transform 0.12s, border-color 0.12s; }
+    .swatch:hover { transform: scale(1.08); }
+    .swatch.selected { border-color: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,0.45); }
+    .field-block { text-align: left; margin-top: 14px; }
+    .field-label { display: block; font-size: 0.82rem; color: #9ca3af; margin-bottom: 4px; }
+    .back-btn { margin-top: 16px; font-size: 0.9rem; color: #9ca3af; background: transparent; border: 1px solid #374151; border-radius: 10px; padding: 8px 14px; cursor: pointer; transition: all 0.15s; width: 100%; }
+    .back-btn:hover { color: #f9fafb; border-color: #6b7280; }
+    .error-hint { font-size: 0.8rem; color: #f87171; margin-top: 4px; min-height: 1rem; }
+
+    @media (max-width: 420px) {
+      body {
+        padding: 8px;
+      }
+
+      .card {
+        padding: 20px;
+        border-radius: 16px;
+      }
+
+      h1 {
+        font-size: 1.35rem;
+      }
+
+      .count {
+        font-size: 3.2rem;
+      }
+
+      .button {
+        padding: 9px 10px;
+        font-size: 0.95rem;
+      }
+    }
   </style>
 </head>
 <body>
@@ -183,6 +218,52 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       <input id="welcomeTargetInput" type="number" min="0" step="1" placeholder="例如：30">
       <button id="startButton" class="button" type="button">開始</button>
     </div>
+    <div style="margin-top:10px">
+      <button id="testButton" class="button" style="width:100%;background:linear-gradient(135deg,#374151,#1f2937)" type="button">燈光測試</button>
+    </div>
+  </section>
+
+  <section id="testScreen" class="card welcome hidden">
+    <h1>燈光測試</h1>
+    <div class="tab-bar">
+      <button class="tab-btn active" id="tabSwitch" type="button">切換燈</button>
+      <button class="tab-btn" id="tabFinal" type="button">最終燈</button>
+    </div>
+
+    <div id="panelSwitch">
+      <div class="swatch-grid" id="swatchGrid"></div>
+      <div class="field-block">
+        <label class="field-label" for="swBrightness">亮度（0–255）</label>
+        <input id="swBrightness" type="number" min="0" max="255" step="1" placeholder="80">
+      </div>
+      <div style="margin-top:12px">
+        <button class="button" style="width:100%" id="applySwitch" type="button">套用</button>
+      </div>
+    </div>
+
+    <div id="panelFinal" class="hidden">
+      <div class="field-block">
+        <label class="field-label" for="finalMin">最小亮度（0–254）</label>
+        <input id="finalMin" type="number" min="0" max="254" step="1" placeholder="0">
+        <div class="error-hint" id="errMin"></div>
+      </div>
+      <div class="field-block">
+        <label class="field-label" for="finalMax">最大亮度（1–255）</label>
+        <input id="finalMax" type="number" min="1" max="255" step="1" placeholder="225">
+        <div class="error-hint" id="errMax"></div>
+      </div>
+      <div class="field-block">
+        <label class="field-label" for="finalPeriod">週期（秒，最小→最大→最小）</label>
+        <input id="finalPeriod" type="number" min="0.1" step="0.1" placeholder="9">
+        <div class="error-hint" id="errPeriod"></div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="button" style="width:100%" id="applyFinal" type="button">套用預覽</button>
+      </div>
+    </div>
+
+    <button class="back-btn" type="button" id="backFromTest">← 返回</button>
+
   </section>
 
   <main id="appScreen" class="card hidden">
@@ -194,10 +275,6 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       <button id="decrementButton" class="button" type="button">-1</button>
       <button id="resetButton" class="button" type="button">歸零</button>
     </div>
-    <div class="target-row">
-      <input id="targetInput" type="number" min="0" step="1" placeholder="輸入目標人數">
-      <button id="setTargetButton" class="button" type="button">設定</button>
-    </div>
   </main>
 
   <script>
@@ -207,7 +284,6 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     function updateUi(state) {
       document.getElementById('count').textContent = state.count;
       document.getElementById('targetDisplay').textContent = `目標人數：${state.target}`;
-      document.getElementById('targetInput').value = state.target;
       if (!hasEnteredApp) {
         document.getElementById('welcomeTargetInput').value = state.target > 0 ? state.target : '';
       }
@@ -263,10 +339,99 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     document.getElementById('incrementButton').addEventListener('click', () => postAction('/increment'));
     document.getElementById('decrementButton').addEventListener('click', () => postAction('/decrement'));
     document.getElementById('resetButton').addEventListener('click', () => postAction('/reset'));
-    document.getElementById('setTargetButton').addEventListener('click', () => {
-      const target = document.getElementById('targetInput').value || '0';
-      postAction('/set-target', `target=${encodeURIComponent(target)}`);
+
+    // ── 燈光測試 ──────────────────────────────────────────
+    const PALETTE = [
+      { name: '薰衣草',     hex: '#E6E6FA' },
+      { name: '淡粉紅',     hex: '#FFB6C1' },
+      { name: '淡土耳其藍', hex: '#AFEEEE' },
+      { name: '粉藍',       hex: '#B0E0E6' },
+      { name: '薊色',       hex: '#D8BFD8' },
+      { name: '紫羅蘭',     hex: '#EE82EE' },
+      { name: '矢車菊藍',   hex: '#6495ED' },
+      { name: '中海藍綠',   hex: '#66CDAA' },
+      { name: '蘭花紫',     hex: '#DA70D6' },
+      { name: '鋼鐵藍',     hex: '#4682B4' },
+      { name: '中紫',       hex: '#9370DB' },
+      { name: '珊瑚',       hex: '#FF7F50' },
+      { name: '天藍',       hex: '#87CEEB' },
+      { name: '淺海綠',     hex: '#20B2AA' },
+      { name: '中板岩藍',   hex: '#7B68EE' },
+      { name: '碧綠',       hex: '#7FFFD4' },
+      { name: '粉紅',       hex: '#FFC0CB' },
+      { name: '綠松石',     hex: '#40E0D0' },
+      { name: '李子紫',     hex: '#DDA0DD' },
+      { name: '深土耳其藍', hex: '#00CED1' },
+    ];
+
+    let selectedColorIdx = 0;
+
+    function showScreen(id) {
+      document.getElementById('welcomeScreen').classList.toggle('hidden', id !== 'welcomeScreen');
+      document.getElementById('testScreen').classList.toggle('hidden', id !== 'testScreen');
+    }
+
+    function switchTab(name) {
+      const isSw = name === 'switch';
+      document.getElementById('panelSwitch').classList.toggle('hidden', !isSw);
+      document.getElementById('panelFinal').classList.toggle('hidden', isSw);
+      document.getElementById('tabSwitch').classList.toggle('active', isSw);
+      document.getElementById('tabFinal').classList.toggle('active', !isSw);
+    }
+
+    function buildSwatchGrid() {
+      const grid = document.getElementById('swatchGrid');
+      PALETTE.forEach((c, i) => {
+        const el = document.createElement('div');
+        el.className = 'swatch' + (i === 0 ? ' selected' : '');
+        el.style.background = c.hex;
+        el.title = c.name;
+        el.addEventListener('click', () => {
+          grid.querySelectorAll('.swatch').forEach(s => s.classList.remove('selected'));
+          el.classList.add('selected');
+          selectedColorIdx = i;
+        });
+        grid.appendChild(el);
+      });
+    }
+
+    document.getElementById('testButton').addEventListener('click', () => showScreen('testScreen'));
+    document.getElementById('backFromTest').addEventListener('click', () => showScreen('welcomeScreen'));
+    document.getElementById('tabSwitch').addEventListener('click', () => switchTab('switch'));
+    document.getElementById('tabFinal').addEventListener('click', () => switchTab('final'));
+
+    document.getElementById('applySwitch').addEventListener('click', async () => {
+      const raw = document.getElementById('swBrightness').value;
+      const br = Math.min(255, Math.max(0, raw !== '' ? parseInt(raw) : 80));
+      await fetch('/led-test/set-color', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+        body: `idx=${selectedColorIdx}&brightness=${br}`
+      });
     });
+
+    document.getElementById('applyFinal').addEventListener('click', async () => {
+      const minBr  = parseInt(document.getElementById('finalMin').value);
+      const maxBr  = parseInt(document.getElementById('finalMax').value);
+      const period = parseFloat(document.getElementById('finalPeriod').value);
+      let valid = true;
+      document.getElementById('errMin').textContent    = '';
+      document.getElementById('errMax').textContent    = '';
+      document.getElementById('errPeriod').textContent = '';
+      if (isNaN(minBr) || minBr < 0)           { document.getElementById('errMin').textContent    = '不可小於 0';       valid = false; }
+      else if (minBr >= maxBr)                  { document.getElementById('errMin').textContent    = '必須小於最大亮度'; valid = false; }
+      if (isNaN(maxBr) || maxBr > 255)          { document.getElementById('errMax').textContent    = '不可大於 255';     valid = false; }
+      else if (!isNaN(minBr) && maxBr <= minBr) { document.getElementById('errMax').textContent    = '必須大於最小亮度'; valid = false; }
+      if (isNaN(period) || period <= 0)         { document.getElementById('errPeriod').textContent = '週期必須大於 0';   valid = false; }
+      if (!valid) return;
+      await fetch('/led-test/set-final', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+        body: `minBr=${minBr}&maxBr=${maxBr}&period=${period}`
+      });
+    });
+
+    buildSwatchGrid();
 
     fetchState();
   </script>
@@ -284,34 +449,18 @@ void showSolid(const CRGB& color) {
   FastLED.show();
 }
 
-void shuffleColorOrder() {
-  for (size_t i = 0; i < COLOR_COUNT; i++) colorOrder[i] = i;
-  for (size_t i = COLOR_COUNT - 1; i > 0; i--) {
-    const size_t j = random(i + 1);
-    const size_t tmp = colorOrder[i];
-    colorOrder[i] = colorOrder[j];
-    colorOrder[j] = tmp;
+CRGB colorForCounter(unsigned long value) {
+  if (value == 0) {
+    return CRGB::Black;
   }
-  // 避免重洗後第一個顏色與上一個相同
-  if (lastColorIdx < COLOR_COUNT && colorOrder[0] == lastColorIdx && COLOR_COUNT > 1) {
-    const size_t tmp = colorOrder[0];
-    colorOrder[0] = colorOrder[1];
-    colorOrder[1] = tmp;
-  }
-  colorOrderPos = 0;
-}
 
-CRGB nextRandomColor() {
-  if (colorOrderPos >= COLOR_COUNT) {
-    shuffleColorOrder();
-  }
-  lastColorIdx = colorOrder[colorOrderPos++];
-  return COLOR_PALETTE[lastColorIdx];
+  const size_t index = (value - 1) % COLOR_COUNT;
+  return COLOR_PALETTE[index];
 }
 
 void startTargetAlert() {
   targetAlertActive = true;
-    alertBreathBrightness = ALERT_BREATH_MIN;
+  alertBreathBrightness = alertBreathMin;
   alertBreathGoingUp = true;
   alertBreathLastStepMs = millis();
   FastLED.setBrightness(alertBreathBrightness);
@@ -319,7 +468,7 @@ void startTargetAlert() {
 }
 
 void renderBaseColor() {
-  showSolid(currentDisplayColor);
+  showSolid(colorForCounter(counter));
 }
 
 bool hasReachedTarget() {
@@ -333,16 +482,16 @@ void refreshTargetAlert() {
 
   const unsigned long now = millis();
 
-  if (now - alertBreathLastStepMs >= ALERT_BREATH_STEP_MS) {
+  if (now - alertBreathLastStepMs >= alertBreathStepMs) {
     alertBreathLastStepMs = now;
     if (alertBreathGoingUp) {
-      if (alertBreathBrightness < ALERT_BREATH_MAX) {
+      if (alertBreathBrightness < alertBreathMax) {
         alertBreathBrightness++;
       } else {
         alertBreathGoingUp = false;
       }
     } else {
-      if (alertBreathBrightness > ALERT_BREATH_MIN) {
+      if (alertBreathBrightness > alertBreathMin) {
         alertBreathBrightness--;
       } else {
         alertBreathGoingUp = true;
@@ -364,13 +513,46 @@ void applyCounterChange(unsigned long newValue, const char* reason) {
         targetAlertActive = false;
         FastLED.setBrightness(80);
       }
-    currentDisplayColor = (counter == 0) ? CRGB::Black : nextRandomColor();
     renderBaseColor();
   }
 
   Serial.print(reason);
   Serial.print(" -> Count: ");
   Serial.println(counter);
+}
+
+void handleLedTestSetColor() {
+  if (server.hasArg("idx") && server.hasArg("brightness")) {
+    const int idx = server.arg("idx").toInt();
+    const int br  = server.arg("brightness").toInt();
+    if (idx >= 0 && idx < (int)COLOR_COUNT && br >= 0 && br <= 255) {
+      targetAlertActive = false;
+      FastLED.setBrightness((uint8_t)br);
+      showSolid(COLOR_PALETTE[idx]);
+    }
+  }
+  server.send(200, "application/json", "{\"ok\":true}");
+}
+
+void handleLedTestSetFinal() {
+  if (server.hasArg("minBr") && server.hasArg("maxBr") && server.hasArg("period")) {
+    const int   minBrVal  = server.arg("minBr").toInt();
+    const int   maxBrVal  = server.arg("maxBr").toInt();
+    const float periodVal = server.arg("period").toFloat();
+    if (minBrVal >= 0 && maxBrVal <= 255 && minBrVal < maxBrVal && periodVal > 0) {
+      alertBreathMin = (uint8_t)minBrVal;
+      alertBreathMax = (uint8_t)maxBrVal;
+      const int steps = (int)(alertBreathMax - alertBreathMin) * 2;
+      alertBreathStepMs = (unsigned long)((periodVal * 1000.0f) / (float)steps);
+      if (alertBreathStepMs < 1) alertBreathStepMs = 1;
+      targetAlertActive     = true;
+      alertBreathBrightness = alertBreathMin;
+      alertBreathGoingUp    = true;
+      alertBreathLastStepMs = millis();
+      showSolid(CRGB::Yellow);
+    }
+  }
+  server.send(200, "application/json", "{\"ok\":true}");
 }
 
 void handleRoot() {
@@ -437,6 +619,8 @@ void setup() {
   server.on("/decrement", HTTP_POST, handleDecrement);
   server.on("/reset", HTTP_POST, handleReset);
   server.on("/set-target", HTTP_POST, handleSetTarget);
+  server.on("/led-test/set-color", HTTP_POST, handleLedTestSetColor);
+  server.on("/led-test/set-final", HTTP_POST, handleLedTestSetFinal);
   server.begin();
 
   Serial.println();
