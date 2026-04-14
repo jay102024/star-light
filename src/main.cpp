@@ -523,6 +523,15 @@ bool hasReachedTarget() {
   return targetCount > 0 && counter >= static_cast<unsigned long>(targetCount);
 }
 
+unsigned long clampCountToTarget(unsigned long value) {
+  if (targetCount <= 0) {
+    return value;
+  }
+
+  const unsigned long target = static_cast<unsigned long>(targetCount);
+  return value > target ? target : value;
+}
+
 void refreshTargetAlert() {
   if (testLightEndMs > millis()) {
     return;
@@ -556,7 +565,7 @@ void refreshTargetAlert() {
 
 void applyCounterChange(unsigned long newValue, const char* reason) {
   const unsigned long previous = counter;
-  counter = newValue;
+  counter = clampCountToTarget(newValue);
 
   if (targetCount > 0 && counter == static_cast<unsigned long>(targetCount) && previous != counter) {
     startTargetAlert();
@@ -608,6 +617,8 @@ void handleSetTarget() {
     const long value = server.arg("target").toInt();
     targetCount = static_cast<int>(value < 0 ? 0 : value);
   }
+
+  counter = clampCountToTarget(counter);
 
   if (targetCount > 0 && counter == static_cast<unsigned long>(targetCount)) {
     startTargetAlert();
