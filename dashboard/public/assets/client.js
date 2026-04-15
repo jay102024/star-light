@@ -31,8 +31,8 @@ async function bootstrap() {
   render();
 
   const socket = io();
-  socket.on('state', (nextTeams) => {
-    teams = nextTeams;
+  socket.on('state', (payload) => {
+    teams = payload.teams;
     render();
   });
 }
