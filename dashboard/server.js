@@ -31,6 +31,10 @@ app.get('/client', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'client.html'));
 });
 
+app.get('/leaderboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'leaderboard.html'));
+});
+
 app.get(`/${ADMIN_PATH_SEGMENT}`, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });

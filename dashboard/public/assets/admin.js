@@ -1,6 +1,16 @@
 const summaryGrid = document.getElementById('summaryGrid');
 const teamGrid = document.getElementById('teamGrid');
 const resetAllButton = document.getElementById('resetAllButton');
+const modeOverlay = document.getElementById('modeOverlay');
+const switchModeButton = document.getElementById('switchModeButton');
+const heroTitle = document.getElementById('heroTitle');
+const heroCopy = document.getElementById('heroCopy');
+const heroEyebrow = document.getElementById('heroEyebrow');
+const panelTitle = document.getElementById('panelTitle');
+const leaderboardOverlay = document.getElementById('leaderboardOverlay');
+const leaderboardButton = document.getElementById('leaderboardButton');
+const closeLeaderboardButton = document.getElementById('closeLeaderboardButton');
+const leaderboardList = document.getElementById('leaderboardList');
 
 let teams = [];
 let mode = null;
@@ -9,6 +19,20 @@ const targetDrafts = {};
 bootstrap();
 
 resetAllButton.addEventListener('click', resetAllCountsAndReload);
+switchModeButton.addEventListener('click', showModeOverlay);
+leaderboardButton.addEventListener('click', showLeaderboardOverlay);
+closeLeaderboardButton.addEventListener('click', hideLeaderboardOverlay);
+leaderboardOverlay.addEventListener('click', (event) => {
+  if (event.target === leaderboardOverlay) {
+    hideLeaderboardOverlay();
+  }
+});
+modeOverlay.querySelectorAll('[data-mode]').forEach((btn) => {
+  btn.addEventListener('click', async () => {
+    const selected = btn.dataset.mode;
+    await setMode(selected);
+  });
+});
 
 async function bootstrap() {
   const response = await fetch('/api/bootstrap');
@@ -30,7 +54,52 @@ async function bootstrap() {
   });
 }
 
+async function setMode(selected) {
+  const response = await fetch('/api/admin/mode', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode: selected })
+  });
+  if (!response.ok) { return; }
+  const data = await response.json();
+  mode = data.mode;
+  hideModeOverlay();
+  render();
+}
+
+function showModeOverlay() {
+  modeOverlay.classList.remove('hidden');
+}
+
+function hideModeOverlay() {
+  modeOverlay.classList.add('hidden');
+}
+
+function showLeaderboardOverlay() {
+  renderLeaderboard();
+  leaderboardOverlay.classList.remove('hidden');
+}
+
+function hideLeaderboardOverlay() {
+  leaderboardOverlay.classList.add('hidden');
+}
+
 function render(skipTeamGrid = false) {
+  if (mode === 'scoring') {
+    heroEyebrow.textContent = '計分模式';
+    heroTitle.textContent = '各桌積分總覽';
+    heroCopy.textContent = '每枚硬幣投入增加 1 分。主畫面維持固定桌次位置，排行榜可另外查看。';
+    panelTitle.textContent = '固定桌次總覽';
+    leaderboardButton.classList.remove('hidden');
+  } else if (mode === 'banquet') {
+    heroEyebrow.textContent = '圓滿餐會';
+    heroTitle.textContent = '各桌連線與完成狀態';
+    heroCopy.textContent = '這個頁面只透過特殊網址進入。用來查看所有設備是否在線、各桌進度，並設定每桌目標人數。';
+    panelTitle.textContent = '桌次總覽';
+    leaderboardButton.classList.add('hidden');
+    hideLeaderboardOverlay();
+  }
+
   renderSummary();
   renderLeaderboard();
 
@@ -93,6 +162,62 @@ function renderSummary() {
 }
 
 function renderTeamGrid() {
+  if (mode === 'scoring') {
+    renderScoringGrid();
+  } else {
+    renderBanquetGrid();
+  }
+}
+
+function renderScoringGrid() {
+  const orderedTeams = getTeamsInDisplayOrder();
+
+  teamGrid.innerHTML = orderedTeams.map((team) => `
+    <article class="team-card score-card">
+      <div class="team-top">
+        <div>
+          <p class="eyebrow">${escapeHtml(team.id)}</p>
+          <h3>${escapeHtml(team.name)}</h3>
+        </div>
+        <div class="status-stack">
+          <span class="pill ${team.deviceOnline ? 'online' : 'offline'}">${team.deviceOnline ? '在線' : '離線'}</span>
+        </div>
+      </div>
+      <div class="team-count-wrap">
+        <div class="team-count score-count">${team.scoreCount} <span class="score-unit">分</span></div>
+      </div>
+      <div class="team-actions-row">
+        <button class="ghost-button team-delta-button" type="button" data-team-delta-id="${team.id}" data-team-delta="-1">-1</button>
+        <button class="brand-button team-delta-button" type="button" data-team-delta-id="${team.id}" data-team-delta="1">+1</button>
+        <button class="danger-button team-reset-button" type="button" data-team-reset-id="${team.id}">歸零</button>
+      </div>
+    </article>
+  `).join('');
+
+  attachDeltaListeners();
+  attachResetListeners();
+}
+
+function renderLeaderboard() {
+  if (mode !== 'scoring') {
+    leaderboardList.innerHTML = '';
+    return;
+  }
+
+  const rankedTeams = getLeaderboardTeams();
+  leaderboardList.innerHTML = rankedTeams.map((team, index) => `
+    <article class="leaderboard-row">
+      <div class="leaderboard-rank">#${index + 1}</div>
+      <div class="leaderboard-meta">
+        <p>${escapeHtml(team.name)}</p>
+        <span>${escapeHtml(team.id)}</span>
+      </div>
+      <div class="leaderboard-score">${team.scoreCount} 分</div>
+    </article>
+  `).join('');
+}
+
+function renderBanquetGrid() {
   teamGrid.innerHTML = teams.map((team) => `
     <article class="team-card">
       <div class="team-top">

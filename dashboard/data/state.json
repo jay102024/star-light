@@ -7,11 +7,11 @@
       "count": 0,
       "scoreCount": 0,
       "target": 0,
-      "testLightSeq": 0,
+      "testLightSeq": 1,
       "deviceId": "esp32-table-1",
       "deviceLastSeenAt": 1776088939576,
-      "clientLastSeenAt": 1776252385919,
-      "updatedAt": 1776252390032
+      "clientLastSeenAt": 1776253134510,
+      "updatedAt": 1776253153150
     },
     {
       "id": "team-2",
@@ -23,31 +23,31 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 1776251187647,
-      "updatedAt": 1776252390032
+      "updatedAt": 1776253142606
     },
     {
       "id": "team-3",
       "name": "第 3 桌",
       "count": 0,
-      "scoreCount": 1,
+      "scoreCount": 0,
       "target": 0,
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 1776252392184,
-      "updatedAt": 1776252392184
+      "clientLastSeenAt": 1776253040646,
+      "updatedAt": 1776253142606
     },
     {
       "id": "team-4",
       "name": "第 4 桌",
       "count": 0,
-      "scoreCount": 1,
+      "scoreCount": 0,
       "target": 0,
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 1776252392540,
-      "updatedAt": 1776252392540
+      "updatedAt": 1776253142606
     },
     {
       "id": "team-5",
@@ -58,8 +58,8 @@
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 1776251559489,
-      "updatedAt": 1776252390032
+      "clientLastSeenAt": 1776253038528,
+      "updatedAt": 1776253142606
     },
     {
       "id": "team-6",
@@ -70,8 +70,8 @@
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 1776251201407,
-      "updatedAt": 1776252390032
+      "clientLastSeenAt": 1776253042187,
+      "updatedAt": 1776253142606
     },
     {
       "id": "team-7",
@@ -82,8 +82,8 @@
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 0,
-      "updatedAt": 1776252390032
+      "clientLastSeenAt": 1776253044189,
+      "updatedAt": 1776253142606
     },
     {
       "id": "team-8",
@@ -94,8 +94,8 @@
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 1776251564745,
-      "updatedAt": 1776252390032
+      "clientLastSeenAt": 1776253045564,
+      "updatedAt": 1776253142606
     },
     {
       "id": "team-9",
@@ -106,8 +106,8 @@
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 0,
-      "updatedAt": 1776252390032
+      "clientLastSeenAt": 1776253048008,
+      "updatedAt": 1776253142606
     },
     {
       "id": "team-10",
@@ -118,8 +118,8 @@
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 1776251567394,
-      "updatedAt": 1776252390032
+      "clientLastSeenAt": 1776253049282,
+      "updatedAt": 1776253142606
     },
     {
       "id": "team-11",
@@ -130,8 +130,8 @@
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 1776251566726,
-      "updatedAt": 1776252390032
+      "clientLastSeenAt": 1776253050221,
+      "updatedAt": 1776253142606
     },
     {
       "id": "team-12",
@@ -143,7 +143,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776252390032
+      "updatedAt": 1776253142606
     },
     {
       "id": "team-13",
@@ -155,7 +155,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 1776251569324,
-      "updatedAt": 1776252390032
+      "updatedAt": 1776253142606
     },
     {
       "id": "team-14",
@@ -167,7 +167,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 1776251577956,
-      "updatedAt": 1776252390032
+      "updatedAt": 1776253142606
     },
     {
       "id": "team-15",
@@ -179,7 +179,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776252390032
+      "updatedAt": 1776253142606
     },
     {
       "id": "team-16",
@@ -191,7 +191,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 1776251571599,
-      "updatedAt": 1776252390032
+      "updatedAt": 1776253142606
     },
     {
       "id": "team-17",
@@ -203,7 +203,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776252390032
+      "updatedAt": 1776253142606
     },
     {
       "id": "team-18",
@@ -215,7 +215,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 1776251574087,
-      "updatedAt": 1776252390032
+      "updatedAt": 1776253142606
     },
     {
       "id": "team-19",
@@ -227,7 +227,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776252390032
+      "updatedAt": 1776253142606
     },
     {
       "id": "team-20",
@@ -239,7 +239,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 1776251575966,
-      "updatedAt": 1776252390032
+      "updatedAt": 1776253142606
     }
   ]
 }

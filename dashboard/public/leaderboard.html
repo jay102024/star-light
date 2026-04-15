@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>排行榜</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body class="lb-body">
+  <main class="lb-shell">
+    <header class="lb-header">
+      <p class="eyebrow" id="lbEyebrow">Leaderboard</p>
+      <h1 id="lbTitle">排行榜</h1>
+    </header>
+
+    <div id="lbContent" class="lb-content">
+      <p class="lb-waiting">等待資料中…</p>
+    </div>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/assets/leaderboard.js"></script>
+</body>
+</html>
