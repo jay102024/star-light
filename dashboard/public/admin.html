@@ -7,11 +7,50 @@
   <link rel="stylesheet" href="/assets/styles.css">
 </head>
 <body class="admin-body">
+  <!-- Mode selector overlay -->
+  <div id="modeOverlay" class="mode-overlay hidden">
+    <div class="mode-card">
+      <p class="eyebrow">Admin Console</p>
+      <h2>選擇活動模式</h2>
+      <p class="mode-desc">請選擇這次要使用的計數模式</p>
+      <div class="mode-buttons">
+        <button class="mode-btn" type="button" data-mode="scoring">
+          <strong>計分模式</strong>
+          <small>每枚硬幣 +1 分，顯示各桌積分排行</small>
+        </button>
+        <button class="mode-btn" type="button" data-mode="banquet">
+          <strong>圓滿餐會</strong>
+          <small>統計各桌投入人數，顯示達標進度</small>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div id="leaderboardOverlay" class="leaderboard-overlay hidden">
+    <div class="leaderboard-card">
+      <div class="leaderboard-head">
+        <div>
+          <p class="eyebrow">Leaderboard</p>
+          <h2>目前排行榜</h2>
+        </div>
+        <button id="closeLeaderboardButton" class="ghost-button" type="button">關閉</button>
+      </div>
+      <div id="leaderboardList" class="leaderboard-list"></div>
+    </div>
+  </div>
+
   <main class="shell admin-shell">
     <section class="hero hero-admin">
-      <p class="eyebrow">Admin Console</p>
-      <h1>各桌連線與完成狀態</h1>
-      <p class="hero-copy">這個頁面只透過特殊網址進入。用來查看所有設備是否在線、各桌進度，並設定每桌目標人數。</p>
+      <div class="hero-top-row">
+        <div>
+          <p class="eyebrow" id="heroEyebrow">Admin Console</p>
+          <h1 id="heroTitle">各桌連線與完成狀態</h1>
+          <p class="hero-copy" id="heroCopy">這個頁面只透過特殊網址進入。用來查看所有設備是否在線、各桌進度，並設定每桌目標人數。</p>
+        </div>
+        <div class="hero-action-row">
+          <button id="leaderboardButton" class="ghost-button switch-mode-btn hidden" type="button">排行榜</button>
+          <button id="switchModeButton" class="ghost-button switch-mode-btn" type="button">切換模式</button>
+        </div>
+      </div>
       <div class="summary-grid" id="summaryGrid"></div>
     </section>
 
@@ -19,7 +58,7 @@
       <div class="panel-head">
         <div>
           <p class="eyebrow">Live Teams</p>
-          <h2>桌次總覽</h2>
+          <h2 id="panelTitle">桌次總覽</h2>
         </div>
         <button id="resetAllButton" class="danger-button" type="button">全部歸零</button>
       </div>

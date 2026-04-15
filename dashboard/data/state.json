@@ -1,224 +1,245 @@
 {
+  "mode": "scoring",
   "teams": [
     {
       "id": "team-1",
       "name": "第 1 桌",
       "count": 0,
+      "scoreCount": 0,
       "target": 0,
       "testLightSeq": 0,
       "deviceId": "esp32-table-1",
       "deviceLastSeenAt": 1776088939576,
-      "clientLastSeenAt": 0,
-      "updatedAt": 1776095896621
+      "clientLastSeenAt": 1776252385919,
+      "updatedAt": 1776252390032
     },
     {
       "id": "team-2",
       "name": "第 2 桌",
       "count": 0,
+      "scoreCount": 0,
       "target": 0,
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 0,
-      "updatedAt": 1776095898769
+      "clientLastSeenAt": 1776251187647,
+      "updatedAt": 1776252390032
     },
     {
       "id": "team-3",
       "name": "第 3 桌",
       "count": 0,
+      "scoreCount": 1,
       "target": 0,
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 0,
-      "updatedAt": 1776095902046
+      "clientLastSeenAt": 1776252392184,
+      "updatedAt": 1776252392184
     },
     {
       "id": "team-4",
       "name": "第 4 桌",
       "count": 0,
+      "scoreCount": 1,
       "target": 0,
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 0,
-      "updatedAt": 1776095904550
+      "clientLastSeenAt": 1776252392540,
+      "updatedAt": 1776252392540
     },
     {
       "id": "team-5",
       "name": "第 5 桌",
       "count": 0,
+      "scoreCount": 0,
       "target": 0,
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 0,
-      "updatedAt": 1776095908125
+      "clientLastSeenAt": 1776251559489,
+      "updatedAt": 1776252390032
     },
     {
       "id": "team-6",
       "name": "第 6 桌",
       "count": 0,
+      "scoreCount": 0,
       "target": 0,
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 0,
-      "updatedAt": 1776089263064
+      "clientLastSeenAt": 1776251201407,
+      "updatedAt": 1776252390032
     },
     {
       "id": "team-7",
       "name": "第 7 桌",
       "count": 0,
+      "scoreCount": 0,
       "target": 0,
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776089263064
+      "updatedAt": 1776252390032
     },
     {
       "id": "team-8",
       "name": "第 8 桌",
       "count": 0,
+      "scoreCount": 0,
       "target": 0,
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 0,
-      "updatedAt": 1776089263064
+      "clientLastSeenAt": 1776251564745,
+      "updatedAt": 1776252390032
     },
     {
       "id": "team-9",
       "name": "第 9 桌",
       "count": 0,
+      "scoreCount": 0,
       "target": 0,
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776089263064
+      "updatedAt": 1776252390032
     },
     {
       "id": "team-10",
       "name": "第 10 桌",
       "count": 0,
+      "scoreCount": 0,
       "target": 0,
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 0,
-      "updatedAt": 1776089263064
+      "clientLastSeenAt": 1776251567394,
+      "updatedAt": 1776252390032
     },
     {
       "id": "team-11",
       "name": "第 11 桌",
       "count": 0,
+      "scoreCount": 0,
       "target": 0,
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 0,
-      "updatedAt": 1776089263064
+      "clientLastSeenAt": 1776251566726,
+      "updatedAt": 1776252390032
     },
     {
       "id": "team-12",
       "name": "第 12 桌",
       "count": 0,
+      "scoreCount": 0,
       "target": 0,
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776089263064
+      "updatedAt": 1776252390032
     },
     {
       "id": "team-13",
       "name": "第 13 桌",
       "count": 0,
+      "scoreCount": 0,
       "target": 0,
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 0,
-      "updatedAt": 1776090197447
+      "clientLastSeenAt": 1776251569324,
+      "updatedAt": 1776252390032
     },
     {
       "id": "team-14",
       "name": "第 14 桌",
       "count": 0,
+      "scoreCount": 0,
       "target": 0,
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 0,
-      "updatedAt": 1776090197447
+      "clientLastSeenAt": 1776251577956,
+      "updatedAt": 1776252390032
     },
     {
       "id": "team-15",
       "name": "第 15 桌",
       "count": 0,
+      "scoreCount": 0,
       "target": 0,
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776090197447
+      "updatedAt": 1776252390032
     },
     {
       "id": "team-16",
       "name": "第 16 桌",
       "count": 0,
+      "scoreCount": 0,
       "target": 0,
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 0,
-      "updatedAt": 1776090197447
+      "clientLastSeenAt": 1776251571599,
+      "updatedAt": 1776252390032
     },
     {
       "id": "team-17",
       "name": "第 17 桌",
       "count": 0,
+      "scoreCount": 0,
       "target": 0,
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776090197447
+      "updatedAt": 1776252390032
     },
     {
       "id": "team-18",
       "name": "第 18 桌",
       "count": 0,
+      "scoreCount": 0,
       "target": 0,
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 0,
-      "updatedAt": 1776090197447
+      "clientLastSeenAt": 1776251574087,
+      "updatedAt": 1776252390032
     },
     {
       "id": "team-19",
       "name": "第 19 桌",
       "count": 0,
+      "scoreCount": 0,
       "target": 0,
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776090197447
+      "updatedAt": 1776252390032
     },
     {
       "id": "team-20",
       "name": "第 20 桌",
       "count": 0,
+      "scoreCount": 0,
       "target": 0,
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 0,
-      "updatedAt": 1776090197447
+      "clientLastSeenAt": 1776251575966,
+      "updatedAt": 1776252390032
     }
   ]
 }

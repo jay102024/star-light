@@ -37,12 +37,25 @@ app.get(`/${ADMIN_PATH_SEGMENT}`, (req, res) => {
 
 app.get('/api/bootstrap', (req, res) => {
   res.json({
+    mode: state.mode,
     teams: serializeTeams(),
     adminPath: `/${ADMIN_PATH_SEGMENT}`,
     deviceTimeoutMs: DEVICE_TIMEOUT_MS,
     clientTimeoutMs: CLIENT_TIMEOUT_MS,
     serverTime: Date.now()
   });
+});
+
+app.post('/api/admin/mode', (req, res) => {
+  const allowed = ['scoring', 'banquet'];
+  const mode = req.body.mode;
+  if (!allowed.includes(mode)) {
+    return res.status(400).json({ error: 'Invalid mode' });
+  }
+
+  state.mode = mode;
+  publishState();
+  return res.json({ ok: true, mode: state.mode });
 });
 
 app.post('/api/teams/:teamId/target', (req, res) => {
@@ -65,7 +78,11 @@ app.post('/api/teams/:teamId/count', (req, res) => {
   }
 
   const delta = normalizeNumber(req.body.delta);
-  team.count = Math.max(0, team.count + delta);
+  if (state.mode === 'scoring') {
+    team.scoreCount = Math.max(0, team.scoreCount + delta);
+  } else {
+    team.count = Math.max(0, team.count + delta);
+  }
   team.clientLastSeenAt = Date.now();
   team.updatedAt = Date.now();
   publishState();
@@ -78,7 +95,11 @@ app.post('/api/teams/:teamId/reset', (req, res) => {
     return res.status(404).json({ error: 'Team not found' });
   }
 
-  team.count = 0;
+  if (state.mode === 'scoring') {
+    team.scoreCount = 0;
+  } else {
+    team.count = 0;
+  }
   team.updatedAt = Date.now();
   publishState();
   return res.json({ team: serializeTeam(team) });
@@ -114,8 +135,12 @@ app.get('/api/teams/:teamId/state', (req, res) => {
 app.post('/api/admin/reset-all', (req, res) => {
   const now = Date.now();
   state.teams.forEach((team) => {
-    team.count = 0;
-    team.clientLastSeenAt = 0;
+    if (state.mode === 'scoring') {
+      team.scoreCount = 0;
+    } else {
+      team.count = 0;
+      team.clientLastSeenAt = 0;
+    }
     team.updatedAt = now;
   });
 
@@ -149,7 +174,12 @@ app.post('/api/devices/heartbeat', (req, res) => {
   team.updatedAt = now;
 
   if (nextCount !== undefined) {
-    team.count = Math.max(0, normalizeNumber(nextCount));
+    const count = Math.max(0, normalizeNumber(nextCount));
+    if (state.mode === 'scoring') {
+      team.scoreCount = count;
+    } else {
+      team.count = count;
+    }
   }
 
   publishState();
@@ -161,11 +191,11 @@ app.get('/healthz', (req, res) => {
 });
 
 io.on('connection', (socket) => {
-  socket.emit('state', serializeTeams());
+  socket.emit('state', { teams: serializeTeams(), mode: state.mode });
 });
 
 setInterval(() => {
-  io.emit('state', serializeTeams());
+  io.emit('state', { teams: serializeTeams(), mode: state.mode });
 }, 5000);
 
 boot().catch((error) => {
@@ -183,10 +213,12 @@ async function boot() {
 
 function createDefaultState() {
   return {
+    mode: null,
     teams: Array.from({ length: DEFAULT_TEAM_COUNT }, (_, index) => ({
       id: `team-${index + 1}`,
       name: `第 ${index + 1} 桌`,
       count: 0,
+      scoreCount: 0,
       target: 0,
       testLightSeq: 0,
       deviceId: '',
@@ -220,10 +252,13 @@ function normalizeState(input) {
     return base;
   }
 
+  base.mode = ['scoring', 'banquet'].includes(input.mode) ? input.mode : null;
+
   const teams = input.teams.slice(0, DEFAULT_TEAM_COUNT).map((team, index) => ({
     id: typeof team.id === 'string' && team.id ? team.id : `team-${index + 1}`,
     name: typeof team.name === 'string' && team.name ? team.name : `第 ${index + 1} 桌`,
     count: Math.max(0, normalizeNumber(team.count)),
+    scoreCount: Math.max(0, normalizeNumber(team.scoreCount)),
     target: Math.max(0, normalizeNumber(team.target)),
     testLightSeq: Math.max(0, normalizeNumber(team.testLightSeq)),
     deviceId: typeof team.deviceId === 'string' ? team.deviceId : '',
@@ -238,6 +273,7 @@ function normalizeState(input) {
       id: `team-${nextIndex}`,
       name: `第 ${nextIndex} 桌`,
       count: 0,
+      scoreCount: 0,
       target: 0,
       testLightSeq: 0,
       deviceId: '',
@@ -269,6 +305,7 @@ function serializeTeam(team) {
     id: team.id,
     name: team.name,
     count: team.count,
+    scoreCount: team.scoreCount,
     target: team.target,
     testLightSeq: normalizeNumber(team.testLightSeq),
     deviceId: team.deviceId,
@@ -287,7 +324,7 @@ function normalizeNumber(value) {
 }
 
 function publishState(shouldPersist = true) {
-  io.emit('state', serializeTeams());
+  io.emit('state', { teams: serializeTeams(), mode: state.mode });
   if (shouldPersist) {
     schedulePersist();
   }
