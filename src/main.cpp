@@ -1,6 +1,7 @@
-#include <Arduino.h>
+﻿#include <Arduino.h>
 #include <WiFi.h>
 #include <WebServer.h>
+#include <HTTPClient.h>
 #include <FastLED.h>
 
 #define SENSOR_PIN 1  // KY-010 光遮斷傳感器的輸出腳位
@@ -10,48 +11,68 @@
 //呼吸燈亮度在 26~28行調整，燈的亮度在404行調整
 CRGB leds[NUM_LEDS];
 
-namespace {
-const char* AP_SSID = "ESP32-Counter";
-const char* AP_PASSWORD = "12345678";
+const char* WIFI_SSID = "counter";
+const char* WIFI_PASSWORD = "88888888";
+const char* SERVER_BASE_URL = "http://192.168.66.101:3000";
+const char* TEAM_ID = "team-1";
+const char* DEVICE_ID = "esp32-table-1";
 
 WebServer server(80);
 volatile unsigned long counter = 0;
 int targetCount = 0;
 int lastSensorState = HIGH;
+unsigned long lastHeartbeatMs = 0;
+unsigned long lastWifiRetryMs = 0;
+unsigned long lastRemoteSyncMs = 0;
+unsigned long testLightEndMs = 0;
+long lastTestLightSeq = 0;
+bool pendingCountSync = false;
+bool isScoringMode = false;
+bool hasModeSync = false;
+
+constexpr unsigned long WIFI_RETRY_INTERVAL_MS = 5000;
+constexpr unsigned long HEARTBEAT_INTERVAL_MS = 5000;
+constexpr unsigned long REMOTE_SYNC_INTERVAL_MS = 1200;
+constexpr unsigned long TEST_LIGHT_DURATION_MS = 1200;
 
 bool targetAlertActive = false;
 uint8_t alertBreathBrightness = 80;
 bool alertBreathGoingUp = true;
 unsigned long alertBreathLastStepMs = 0;
 
-unsigned long alertBreathStepMs = 50;
-uint8_t alertBreathMin = 10;
-uint8_t alertBreathMax = 255;
+constexpr unsigned long ALERT_BREATH_STEP_MS = 5;
+constexpr uint8_t ALERT_BREATH_MIN = 10;
+constexpr uint8_t ALERT_BREATH_MAX = 255;
 
 const CRGB COLOR_PALETTE[] = {
-  CRGB(230, 230, 250),  // 薰衣草
-  CRGB(255, 182, 193),  // 淡粉紅
-  CRGB(175, 238, 238),  // 淡土耳其藍
-  CRGB(176, 224, 230),  // 粉藍
-  CRGB(216, 191, 216),  // 薊色
-  CRGB(238, 130, 238),  // 紫羅蘭
-  CRGB(100, 149, 237),  // 矢車菊藍
-  CRGB(102, 205, 170),  // 中海藍綠
-  CRGB(218, 112, 214),  // 蘭花紫
-  CRGB(70, 130, 180),   // 鋼鐵藍
-  CRGB(147, 112, 219),  // 中紫
-  CRGB(255, 127, 80),   // 珊瑚
-  CRGB(135, 206, 235),  // 天藍
-  CRGB(32, 178, 170),   // 淺海綠
-  CRGB(123, 104, 238),  // 中板岩藍
-  CRGB(127, 255, 212),  // 碧綠
-  CRGB(255, 192, 203),  // 粉紅
-  CRGB(64, 224, 208),   // 綠松石
-  CRGB(221, 160, 221),  // 李子紫
-  CRGB(0, 206, 209)     // 深土耳其藍
+  CRGB::Lavender,
+  CRGB::LightPink,
+  CRGB::PaleTurquoise,
+  CRGB::PowderBlue,
+  CRGB::Thistle,
+  CRGB::Violet,
+  CRGB::CornflowerBlue,
+  CRGB::MediumAquamarine,
+  CRGB::Orchid,
+  CRGB::SteelBlue,
+  CRGB::MediumPurple,
+  CRGB::Coral,
+  CRGB::SkyBlue,
+  CRGB::LightSeaGreen,
+  CRGB::MediumSlateBlue,
+  CRGB::Aquamarine,
+  CRGB::Pink,
+  CRGB::Turquoise,
+  CRGB::Plum,
+  CRGB::DarkTurquoise
 };
 
 const size_t COLOR_COUNT = sizeof(COLOR_PALETTE) / sizeof(COLOR_PALETTE[0]);
+
+size_t colorOrder[COLOR_COUNT];
+size_t colorOrderPos = COLOR_COUNT;  // 初始值 == COLOR_COUNT，觸發第一次 shuffle
+size_t lastColorIdx = COLOR_COUNT;   // 哨兵：尚無上一個顏色
+CRGB  currentDisplayColor = CRGB::Black;
 
 const char INDEX_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
@@ -68,24 +89,21 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 
     body {
       margin: 0;
-      min-height: 100dvh;
+      min-height: 100vh;
       display: grid;
       place-items: center;
       background: linear-gradient(135deg, #111827, #1f2937);
       color: #f9fafb;
-      padding: 12px;
-      box-sizing: border-box;
     }
 
     .card {
-      width: min(100%, 420px);
+      width: min(90vw, 420px);
       padding: 32px;
       border-radius: 24px;
       background: rgba(255, 255, 255, 0.08);
       box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
       text-align: center;
       backdrop-filter: blur(10px);
-      box-sizing: border-box;
     }
 
     .hidden {
@@ -93,7 +111,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     }
 
     .welcome {
-      width: min(100%, 460px);
+      width: min(92vw, 460px);
     }
 
     h1 {
@@ -109,15 +127,24 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 
     .count {
       margin: 24px 0;
+      display: inline-flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 6px;
       font-size: 4rem;
       font-weight: 700;
       color: #60a5fa;
     }
 
-    .target-display {
-      margin-top: 8px;
+    .count-current {
+      line-height: 1;
+    }
+
+    .count-target {
       color: #bfdbfe;
-      font-size: 0.98rem;
+      font-size: 1.2rem;
+      line-height: 1.1;
+      transform: translateY(-0.2rem);
     }
 
     .actions {
@@ -171,42 +198,6 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       color: #d1d5db;
       line-height: 1.6;
     }
-    .tab-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; }
-    .tab-btn { border: none; border-radius: 10px; padding: 10px 0; font-size: 0.95rem; font-weight: 600; color: #9ca3af; background: rgba(255,255,255,0.06); cursor: pointer; transition: all 0.15s; width: 100%; }
-    .tab-btn.active { color: #f9fafb; background: linear-gradient(135deg, #7c3aed, #6d28d9); }
-    .swatch-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 12px 0; }
-    .swatch { aspect-ratio: 1; border-radius: 8px; border: 3px solid transparent; cursor: pointer; transition: transform 0.12s, border-color 0.12s; }
-    .swatch:hover { transform: scale(1.08); }
-    .swatch.selected { border-color: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,0.45); }
-    .field-block { text-align: left; margin-top: 14px; }
-    .field-label { display: block; font-size: 0.82rem; color: #9ca3af; margin-bottom: 4px; }
-    .back-btn { margin-top: 16px; font-size: 0.9rem; color: #9ca3af; background: transparent; border: 1px solid #374151; border-radius: 10px; padding: 8px 14px; cursor: pointer; transition: all 0.15s; width: 100%; }
-    .back-btn:hover { color: #f9fafb; border-color: #6b7280; }
-    .error-hint { font-size: 0.8rem; color: #f87171; margin-top: 4px; min-height: 1rem; }
-
-    @media (max-width: 420px) {
-      body {
-        padding: 8px;
-      }
-
-      .card {
-        padding: 20px;
-        border-radius: 16px;
-      }
-
-      h1 {
-        font-size: 1.35rem;
-      }
-
-      .count {
-        font-size: 3.2rem;
-      }
-
-      .button {
-        padding: 9px 10px;
-        font-size: 0.95rem;
-      }
-    }
   </style>
 </head>
 <body>
@@ -217,58 +208,14 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       <input id="welcomeTargetInput" type="number" min="0" step="1" placeholder="例如：30">
       <button id="startButton" class="button" type="button">開始</button>
     </div>
-    <div style="margin-top:10px">
-      <button id="testButton" class="button" style="width:100%;background:linear-gradient(135deg,#374151,#1f2937)" type="button">燈光測試</button>
-    </div>
-  </section>
-
-  <section id="testScreen" class="card welcome hidden">
-    <h1>燈光測試</h1>
-    <div class="tab-bar">
-      <button class="tab-btn active" id="tabSwitch" type="button">切換燈</button>
-      <button class="tab-btn" id="tabFinal" type="button">最終燈</button>
-    </div>
-
-    <div id="panelSwitch">
-      <div class="swatch-grid" id="swatchGrid"></div>
-      <div class="field-block">
-        <label class="field-label" for="swBrightness">亮度（0–255）</label>
-        <input id="swBrightness" type="number" min="0" max="255" step="1" placeholder="80">
-      </div>
-      <div style="margin-top:12px">
-        <button class="button" style="width:100%" id="applySwitch" type="button">套用</button>
-      </div>
-    </div>
-
-    <div id="panelFinal" class="hidden">
-      <div class="field-block">
-        <label class="field-label" for="finalMin">最小亮度（0–254）</label>
-        <input id="finalMin" type="number" min="0" max="254" step="1" placeholder="0">
-        <div class="error-hint" id="errMin"></div>
-      </div>
-      <div class="field-block">
-        <label class="field-label" for="finalMax">最大亮度（1–255）</label>
-        <input id="finalMax" type="number" min="1" max="255" step="1" placeholder="225">
-        <div class="error-hint" id="errMax"></div>
-      </div>
-      <div class="field-block">
-        <label class="field-label" for="finalPeriod">週期（秒，最小→最大→最小）</label>
-        <input id="finalPeriod" type="number" min="0.1" step="0.1" placeholder="9">
-        <div class="error-hint" id="errPeriod"></div>
-      </div>
-      <div style="margin-top:12px">
-        <button class="button" style="width:100%" id="applyFinal" type="button">套用預覽</button>
-      </div>
-    </div>
-
-    <button class="back-btn" type="button" id="backFromTest">← 返回</button>
-
   </section>
 
   <main id="appScreen" class="card hidden">
     <h1>目前人數</h1>
-    <div id="count" class="count">0</div>
-    <div id="targetDisplay" class="target-display">目標人數：0</div>
+    <div class="count">
+      <span id="count" class="count-current">0</span>
+      <span id="targetDisplay" class="count-target">/0</span>
+    </div>
     <div class="actions">
       <button id="incrementButton" class="button" type="button">+1</button>
       <button id="decrementButton" class="button" type="button">-1</button>
@@ -282,7 +229,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 
     function updateUi(state) {
       document.getElementById('count').textContent = state.count;
-      document.getElementById('targetDisplay').textContent = `目標人數：${state.target}`;
+      document.getElementById('targetDisplay').textContent = `/${state.target}`;
       if (!hasEnteredApp) {
         document.getElementById('welcomeTargetInput').value = state.target > 0 ? state.target : '';
       }
@@ -339,108 +286,409 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     document.getElementById('decrementButton').addEventListener('click', () => postAction('/decrement'));
     document.getElementById('resetButton').addEventListener('click', () => postAction('/reset'));
 
-    // ── 燈光測試 ──────────────────────────────────────────
-    const PALETTE = [
-      { name: '薰衣草',     hex: '#E6E6FA' },
-      { name: '淡粉紅',     hex: '#FFB6C1' },
-      { name: '淡土耳其藍', hex: '#AFEEEE' },
-      { name: '粉藍',       hex: '#B0E0E6' },
-      { name: '薊色',       hex: '#D8BFD8' },
-      { name: '紫羅蘭',     hex: '#EE82EE' },
-      { name: '矢車菊藍',   hex: '#6495ED' },
-      { name: '中海藍綠',   hex: '#66CDAA' },
-      { name: '蘭花紫',     hex: '#DA70D6' },
-      { name: '鋼鐵藍',     hex: '#4682B4' },
-      { name: '中紫',       hex: '#9370DB' },
-      { name: '珊瑚',       hex: '#FF7F50' },
-      { name: '天藍',       hex: '#87CEEB' },
-      { name: '淺海綠',     hex: '#20B2AA' },
-      { name: '中板岩藍',   hex: '#7B68EE' },
-      { name: '碧綠',       hex: '#7FFFD4' },
-      { name: '粉紅',       hex: '#FFC0CB' },
-      { name: '綠松石',     hex: '#40E0D0' },
-      { name: '李子紫',     hex: '#DDA0DD' },
-      { name: '深土耳其藍', hex: '#00CED1' },
-    ];
-
-    let selectedColorIdx = 0;
-
-    function showScreen(id) {
-      document.getElementById('welcomeScreen').classList.toggle('hidden', id !== 'welcomeScreen');
-      document.getElementById('testScreen').classList.toggle('hidden', id !== 'testScreen');
-    }
-
-    function switchTab(name) {
-      const isSw = name === 'switch';
-      document.getElementById('panelSwitch').classList.toggle('hidden', !isSw);
-      document.getElementById('panelFinal').classList.toggle('hidden', isSw);
-      document.getElementById('tabSwitch').classList.toggle('active', isSw);
-      document.getElementById('tabFinal').classList.toggle('active', !isSw);
-    }
-
-    function buildSwatchGrid() {
-      const grid = document.getElementById('swatchGrid');
-      PALETTE.forEach((c, i) => {
-        const el = document.createElement('div');
-        el.className = 'swatch' + (i === 0 ? ' selected' : '');
-        el.style.background = c.hex;
-        el.title = c.name;
-        el.addEventListener('click', () => {
-          grid.querySelectorAll('.swatch').forEach(s => s.classList.remove('selected'));
-          el.classList.add('selected');
-          selectedColorIdx = i;
-        });
-        grid.appendChild(el);
-      });
-    }
-
-    document.getElementById('testButton').addEventListener('click', () => showScreen('testScreen'));
-    document.getElementById('backFromTest').addEventListener('click', () => showScreen('welcomeScreen'));
-    document.getElementById('tabSwitch').addEventListener('click', () => switchTab('switch'));
-    document.getElementById('tabFinal').addEventListener('click', () => switchTab('final'));
-
-    document.getElementById('applySwitch').addEventListener('click', async () => {
-      const raw = document.getElementById('swBrightness').value;
-      const br = Math.min(255, Math.max(0, raw !== '' ? parseInt(raw) : 80));
-      await fetch('/led-test/set-color', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-        body: `idx=${selectedColorIdx}&brightness=${br}`
-      });
-    });
-
-    document.getElementById('applyFinal').addEventListener('click', async () => {
-      const minBr  = parseInt(document.getElementById('finalMin').value);
-      const maxBr  = parseInt(document.getElementById('finalMax').value);
-      const period = parseFloat(document.getElementById('finalPeriod').value);
-      let valid = true;
-      document.getElementById('errMin').textContent    = '';
-      document.getElementById('errMax').textContent    = '';
-      document.getElementById('errPeriod').textContent = '';
-      if (isNaN(minBr) || minBr < 0)           { document.getElementById('errMin').textContent    = '不可小於 0';       valid = false; }
-      else if (minBr >= maxBr)                  { document.getElementById('errMin').textContent    = '必須小於最大亮度'; valid = false; }
-      if (isNaN(maxBr) || maxBr > 255)          { document.getElementById('errMax').textContent    = '不可大於 255';     valid = false; }
-      else if (!isNaN(minBr) && maxBr <= minBr) { document.getElementById('errMax').textContent    = '必須大於最小亮度'; valid = false; }
-      if (isNaN(period) || period <= 0)         { document.getElementById('errPeriod').textContent = '週期必須大於 0';   valid = false; }
-      if (!valid) return;
-      await fetch('/led-test/set-final', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-        body: `minBr=${minBr}&maxBr=${maxBr}&period=${period}`
-      });
-    });
-
-    buildSwatchGrid();
-
     fetchState();
   </script>
 </body>
 </html>
 )rawliteral";
-}  // namespace
+
+// ===== Forward declarations for functions defined below =====
+void showSolid(const CRGB& color);
+void sendHeartbeat(bool, bool);
+void refreshTargetAlert();
+void scoringMode_renderLedState();
+void countingMode_renderLedState();
+void scoringMode_applyCounterChange(unsigned long newValue);
+void countingMode_applyCounterChange(unsigned long newValue);
+void startTargetAlert();
+void renderBaseColor();
+CRGB nextRandomColor();
+void triggerTestLight();
+void refreshTestLight();
+void runScoreRainbowLap();
 
 String stateJson() {
   return "{\"count\":" + String(counter) + ",\"target\":" + String(targetCount) + "}";
+}
+
+void ensureWifiConnected() {
+  if (WiFi.status() == WL_CONNECTED) {
+    return;
+  }
+
+  const unsigned long now = millis();
+  if (now - lastWifiRetryMs < WIFI_RETRY_INTERVAL_MS) {
+    return;
+  }
+
+  lastWifiRetryMs = now;
+  Serial.println("Wi-Fi disconnected, retrying...");
+  WiFi.disconnect();
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+}
+
+long extractJsonLong(const String& json, const char* key, long defaultValue) {
+  const String pattern = String("\"") + key + "\":";
+  const int start = json.indexOf(pattern);
+  if (start < 0) {
+    return defaultValue;
+  }
+
+  int valueStart = start + pattern.length();
+  while (valueStart < static_cast<int>(json.length()) &&
+         (json[valueStart] == ' ' || json[valueStart] == '\t')) {
+    valueStart++;
+  }
+
+  int valueEnd = valueStart;
+  while (valueEnd < static_cast<int>(json.length()) &&
+         (json[valueEnd] == '-' || (json[valueEnd] >= '0' && json[valueEnd] <= '9'))) {
+    valueEnd++;
+  }
+
+  if (valueEnd == valueStart) {
+    return defaultValue;
+  }
+
+  return json.substring(valueStart, valueEnd).toInt();
+}
+
+// ===== SCORING MODE - INDEPENDENT FUNCTIONS =====
+
+void scoringMode_applyRemoteState(unsigned long newCount, int newTarget) {
+  const unsigned long previous = counter;
+  counter = newCount;
+  targetCount = newTarget < 0 ? 0 : newTarget;
+  const bool scoringIncrement = newCount > previous;
+
+  Serial.print("Scoring Mode - Remote sync -> Count: ");
+  Serial.print(counter);
+  Serial.print(" / Target: ");
+  Serial.println(targetCount);
+
+  currentDisplayColor = (counter == 0) ? CRGB::Black : nextRandomColor();
+  scoringMode_renderLedState();
+
+  if (scoringIncrement) {
+    runScoreRainbowLap();
+  }
+}
+
+void scoringMode_applyCounterChange(unsigned long newValue) {
+  const unsigned long previous = counter;
+  counter = newValue;
+  pendingCountSync = true;
+
+  Serial.print("Scoring Mode - Sensor/Manual +1 -> Count: ");
+  Serial.println(counter);
+
+  currentDisplayColor = (counter == 0) ? CRGB::Black : nextRandomColor();
+  scoringMode_renderLedState();
+
+  if (newValue == previous + 1) {
+    runScoreRainbowLap();
+  }
+
+  sendHeartbeat(true, true);
+}
+
+void scoringMode_renderLedState() {
+  if (testLightEndMs > millis()) {
+    FastLED.setBrightness(220);
+    showSolid(CRGB::White);
+    return;
+  }
+
+  // In scoring mode, keep LEDs off when no test light is active.
+  currentDisplayColor = CRGB::Black;
+  FastLED.setBrightness(80);
+  showSolid(CRGB::Black);
+}
+
+void scoringMode_handleSensorInput() {
+  const int sensorState = digitalRead(SENSOR_PIN);
+
+  if (lastSensorState == HIGH && sensorState == LOW) {
+    scoringMode_applyCounterChange(counter + 1);
+    delay(50);
+  }
+
+  lastSensorState = sensorState;
+}
+
+void scoringMode_handleIncrement() {
+  scoringMode_applyCounterChange(counter + 1);
+}
+
+void scoringMode_handleDecrement() {
+  if (counter > 0) {
+    counter--;
+    pendingCountSync = true;
+    Serial.print("Scoring Mode - Manual -1 -> Count: ");
+    Serial.println(counter);
+    currentDisplayColor = (counter == 0) ? CRGB::Black : nextRandomColor();
+    scoringMode_renderLedState();
+    sendHeartbeat(true, true);
+  }
+}
+
+void scoringMode_handleReset() {
+  counter = 0;
+  pendingCountSync = true;
+  Serial.println("Scoring Mode - Reset");
+  currentDisplayColor = CRGB::Black;
+  scoringMode_renderLedState();
+  sendHeartbeat(true, true);
+}
+
+void scoringMode_handleSetTarget() {
+  if (server.hasArg("target")) {
+    const long value = server.arg("target").toInt();
+    targetCount = static_cast<int>(value < 0 ? 0 : value);
+    Serial.print("Scoring Mode - Target set: ");
+    Serial.println(targetCount);
+  }
+}
+
+void scoringMode_refreshLoop() {
+  refreshTestLight();
+  scoringMode_renderLedState();
+  scoringMode_handleSensorInput();
+}
+
+// ===== COUNTING MODE - INDEPENDENT FUNCTIONS =====
+
+void countingMode_applyRemoteState(unsigned long newCount, int newTarget) {
+  const unsigned long previous = counter;
+  counter = newCount;
+  targetCount = newTarget < 0 ? 0 : newTarget;
+
+  const bool banquetTargetReached = targetCount > 0 && counter == static_cast<unsigned long>(targetCount) && previous != counter;
+
+  Serial.print("Counting Mode - Remote sync -> Count: ");
+  Serial.print(counter);
+  Serial.print(" / Target: ");
+  Serial.println(targetCount);
+
+  if (banquetTargetReached) {
+    startTargetAlert();
+  } else {
+    if (counter != static_cast<unsigned long>(targetCount)) {
+      targetAlertActive = false;
+      FastLED.setBrightness(80);
+    }
+    currentDisplayColor = (counter == 0) ? CRGB::Black : nextRandomColor();
+    countingMode_renderLedState();
+  }
+}
+
+void countingMode_applyCounterChange(unsigned long newValue) {
+  const unsigned long previous = counter;
+  counter = newValue;
+  pendingCountSync = true;
+
+  const bool banquetTargetReached = targetCount > 0 && counter == static_cast<unsigned long>(targetCount) && previous != counter;
+
+  Serial.print("Counting Mode - Sensor/Manual +1 -> Count: ");
+  Serial.println(counter);
+
+  if (banquetTargetReached) {
+    startTargetAlert();
+  } else {
+    if (counter != static_cast<unsigned long>(targetCount)) {
+      targetAlertActive = false;
+      FastLED.setBrightness(80);
+    }
+    currentDisplayColor = (counter == 0) ? CRGB::Black : nextRandomColor();
+    countingMode_renderLedState();
+  }
+
+  sendHeartbeat(true, true);
+}
+
+void countingMode_renderLedState() {
+  if (testLightEndMs > millis()) {
+    FastLED.setBrightness(220);
+    showSolid(CRGB::White);
+    return;
+  }
+
+  if (targetAlertActive) {
+    FastLED.setBrightness(alertBreathBrightness);
+    showSolid(CRGB::Yellow);
+    return;
+  }
+
+  FastLED.setBrightness(80);
+  renderBaseColor();
+}
+
+bool countingMode_hasReachedTarget() {
+  return targetCount > 0 && counter >= static_cast<unsigned long>(targetCount);
+}
+
+void countingMode_handleSensorInput() {
+  const int sensorState = digitalRead(SENSOR_PIN);
+
+  if (lastSensorState == HIGH && sensorState == LOW && !countingMode_hasReachedTarget()) {
+    countingMode_applyCounterChange(counter + 1);
+    delay(50);
+  }
+
+  lastSensorState = sensorState;
+}
+
+void countingMode_handleIncrement() {
+  if (!countingMode_hasReachedTarget()) {
+    countingMode_applyCounterChange(counter + 1);
+  }
+}
+
+void countingMode_handleDecrement() {
+  if (counter > 0) {
+    counter--;
+    pendingCountSync = true;
+    Serial.print("Counting Mode - Manual -1 -> Count: ");
+    Serial.println(counter);
+    if (counter != static_cast<unsigned long>(targetCount)) {
+      targetAlertActive = false;
+      FastLED.setBrightness(80);
+    }
+    currentDisplayColor = (counter == 0) ? CRGB::Black : nextRandomColor();
+    countingMode_renderLedState();
+    sendHeartbeat(true, true);
+  }
+}
+
+void countingMode_handleReset() {
+  counter = 0;
+  pendingCountSync = true;
+  Serial.println("Counting Mode - Reset");
+  targetAlertActive = false;
+  FastLED.setBrightness(80);
+  currentDisplayColor = CRGB::Black;
+  countingMode_renderLedState();
+  sendHeartbeat(true, true);
+}
+
+void countingMode_handleSetTarget() {
+  if (server.hasArg("target")) {
+    const long value = server.arg("target").toInt();
+    targetCount = static_cast<int>(value < 0 ? 0 : value);
+    Serial.print("Counting Mode - Target set: ");
+    Serial.println(targetCount);
+  }
+
+  if (targetCount > 0 && counter == static_cast<unsigned long>(targetCount)) {
+    startTargetAlert();
+  } else {
+    targetAlertActive = false;
+    FastLED.setBrightness(80);
+    countingMode_renderLedState();
+  }
+}
+
+void countingMode_refreshLoop() {
+  refreshTestLight();
+  refreshTargetAlert();
+  countingMode_renderLedState();
+  countingMode_handleSensorInput();
+}
+
+void fetchRemoteState(bool forceNow = false) {
+  const unsigned long now = millis();
+  if (!forceNow && now - lastRemoteSyncMs < REMOTE_SYNC_INTERVAL_MS) {
+    return;
+  }
+
+  if (WiFi.status() != WL_CONNECTED) {
+    return;
+  }
+
+  lastRemoteSyncMs = now;
+
+  HTTPClient http;
+  const String url = String(SERVER_BASE_URL) + "/api/teams/" + TEAM_ID + "/state";
+  http.begin(url);
+  const int statusCode = http.GET();
+  if (statusCode < 200 || statusCode >= 300) {
+    http.end();
+    return;
+  }
+
+  const String body = http.getString();
+  http.end();
+
+  if (body.indexOf("\"mode\":\"scoring\"") >= 0) {
+    isScoringMode = true;
+    hasModeSync = true;
+  } else if (body.indexOf("\"mode\":") >= 0) {
+    isScoringMode = false;
+    hasModeSync = true;
+  }
+
+  const long syncedCount = extractJsonLong(body, "count", static_cast<long>(counter));
+  const long syncedTarget = extractJsonLong(body, "target", static_cast<long>(targetCount));
+  const long syncedTestLightSeq = extractJsonLong(body, "testLightSeq", lastTestLightSeq);
+
+  if (syncedTestLightSeq > lastTestLightSeq) {
+    lastTestLightSeq = syncedTestLightSeq;
+    triggerTestLight();
+  }
+
+  if (syncedCount < 0) {
+    return;
+  }
+
+  unsigned long mergedCount = static_cast<unsigned long>(syncedCount);
+  if (pendingCountSync && mergedCount < counter) {
+    // Local count changed recently and has not been confirmed by host yet.
+    // Ignore stale lower remote count to avoid jumping back to 0 then +1.
+    mergedCount = counter;
+  }
+
+  if (mergedCount != counter || static_cast<int>(syncedTarget) != targetCount) {
+    if (isScoringMode) {
+      scoringMode_applyRemoteState(mergedCount, static_cast<int>(syncedTarget));
+    } else {
+      countingMode_applyRemoteState(mergedCount, static_cast<int>(syncedTarget));
+    }
+  }
+}
+
+void sendHeartbeat(bool forceNow = false, bool includeCount = false) {
+  const unsigned long now = millis();
+  if (!forceNow && now - lastHeartbeatMs < HEARTBEAT_INTERVAL_MS) {
+    return;
+  }
+
+  if (WiFi.status() != WL_CONNECTED) {
+    return;
+  }
+
+  lastHeartbeatMs = now;
+
+  HTTPClient http;
+  const String url = String(SERVER_BASE_URL) + "/api/devices/heartbeat";
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+
+  const bool shouldIncludeCount = includeCount || pendingCountSync;
+
+  const String payload =
+      String("{\"teamId\":\"") + TEAM_ID +
+      "\",\"deviceId\":\"" + DEVICE_ID +
+      (shouldIncludeCount ? String("\",\"count\":") + String(counter) : String()) +
+      "}";
+
+  const int statusCode = http.POST(payload);
+  if (statusCode < 200 || statusCode >= 300) {
+    Serial.print("Heartbeat failed, status: ");
+    Serial.println(statusCode);
+  } else if (shouldIncludeCount) {
+    pendingCountSync = false;
+  }
+  http.end();
 }
 
 void showSolid(const CRGB& color) {
@@ -448,18 +696,49 @@ void showSolid(const CRGB& color) {
   FastLED.show();
 }
 
-CRGB colorForCounter(unsigned long value) {
-  if (value == 0) {
-    return CRGB::Black;
+void runScoreRainbowLap() {
+  // 24 LEDs (2x12 WS2812B in series): run one full rainbow cycle.
+  for (uint16_t baseHue = 0; baseHue < 256; baseHue += 8) {
+    for (uint8_t i = 0; i < NUM_LEDS; ++i) {
+      const uint8_t hue = static_cast<uint8_t>(baseHue + (i * 256 / NUM_LEDS));
+      leds[i] = CHSV(hue, 255, 180);
+    }
+    FastLED.show();
+    delay(10);
   }
 
-  const size_t index = (value - 1) % COLOR_COUNT;
-  return COLOR_PALETTE[index];
+  // Turn off immediately after rainbow completes.
+  showSolid(CRGB::Black);
+}
+
+void shuffleColorOrder() {
+  for (size_t i = 0; i < COLOR_COUNT; i++) colorOrder[i] = i;
+  for (size_t i = COLOR_COUNT - 1; i > 0; i--) {
+    const size_t j = random(i + 1);
+    const size_t tmp = colorOrder[i];
+    colorOrder[i] = colorOrder[j];
+    colorOrder[j] = tmp;
+  }
+  // 避免重洗後第一個顏色與上一個相同
+  if (lastColorIdx < COLOR_COUNT && colorOrder[0] == lastColorIdx && COLOR_COUNT > 1) {
+    const size_t tmp = colorOrder[0];
+    colorOrder[0] = colorOrder[1];
+    colorOrder[1] = tmp;
+  }
+  colorOrderPos = 0;
+}
+
+CRGB nextRandomColor() {
+  if (colorOrderPos >= COLOR_COUNT) {
+    shuffleColorOrder();
+  }
+  lastColorIdx = colorOrder[colorOrderPos++];
+  return COLOR_PALETTE[lastColorIdx];
 }
 
 void startTargetAlert() {
   targetAlertActive = true;
-  alertBreathBrightness = alertBreathMin;
+    alertBreathBrightness = ALERT_BREATH_MIN;
   alertBreathGoingUp = true;
   alertBreathLastStepMs = millis();
   FastLED.setBrightness(alertBreathBrightness);
@@ -467,30 +746,48 @@ void startTargetAlert() {
 }
 
 void renderBaseColor() {
-  showSolid(colorForCounter(counter));
+  showSolid(currentDisplayColor);
 }
 
-bool hasReachedTarget() {
-  return targetCount > 0 && counter >= static_cast<unsigned long>(targetCount);
+void triggerTestLight() {
+  testLightEndMs = millis() + TEST_LIGHT_DURATION_MS;
+  Serial.println("Test light triggered");
+}
+
+void refreshTestLight() {
+  if (testLightEndMs == 0) {
+    return;
+  }
+
+  const unsigned long now = millis();
+  if (now < testLightEndMs) {
+    return;
+  }
+
+  testLightEndMs = 0;
 }
 
 void refreshTargetAlert() {
+  if (testLightEndMs > millis()) {
+    return;
+  }
+
   if (!targetAlertActive) {
     return;
   }
 
   const unsigned long now = millis();
 
-  if (now - alertBreathLastStepMs >= alertBreathStepMs) {
+  if (now - alertBreathLastStepMs >= ALERT_BREATH_STEP_MS) {
     alertBreathLastStepMs = now;
     if (alertBreathGoingUp) {
-      if (alertBreathBrightness < alertBreathMax) {
+      if (alertBreathBrightness < ALERT_BREATH_MAX) {
         alertBreathBrightness++;
       } else {
         alertBreathGoingUp = false;
       }
     } else {
-      if (alertBreathBrightness > alertBreathMin) {
+      if (alertBreathBrightness > ALERT_BREATH_MIN) {
         alertBreathBrightness--;
       } else {
         alertBreathGoingUp = true;
@@ -499,59 +796,6 @@ void refreshTargetAlert() {
     FastLED.setBrightness(alertBreathBrightness);
     FastLED.show();
   }
-}
-
-void applyCounterChange(unsigned long newValue, const char* reason) {
-  const unsigned long previous = counter;
-  counter = newValue;
-
-  if (targetCount > 0 && counter == static_cast<unsigned long>(targetCount) && previous != counter) {
-    startTargetAlert();
-  } else {
-    if (counter != static_cast<unsigned long>(targetCount)) {
-        targetAlertActive = false;
-        FastLED.setBrightness(80);
-      }
-    renderBaseColor();
-  }
-
-  Serial.print(reason);
-  Serial.print(" -> Count: ");
-  Serial.println(counter);
-}
-
-void handleLedTestSetColor() {
-  if (server.hasArg("idx") && server.hasArg("brightness")) {
-    const int idx = server.arg("idx").toInt();
-    const int br  = server.arg("brightness").toInt();
-    if (idx >= 0 && idx < (int)COLOR_COUNT && br >= 0 && br <= 255) {
-      targetAlertActive = false;
-      FastLED.setBrightness((uint8_t)br);
-      showSolid(COLOR_PALETTE[idx]);
-    }
-  }
-  server.send(200, "application/json", "{\"ok\":true}");
-}
-
-void handleLedTestSetFinal() {
-  if (server.hasArg("minBr") && server.hasArg("maxBr") && server.hasArg("period")) {
-    const int   minBrVal  = server.arg("minBr").toInt();
-    const int   maxBrVal  = server.arg("maxBr").toInt();
-    const float periodVal = server.arg("period").toFloat();
-    if (minBrVal >= 0 && maxBrVal <= 255 && minBrVal < maxBrVal && periodVal > 0) {
-      alertBreathMin = (uint8_t)minBrVal;
-      alertBreathMax = (uint8_t)maxBrVal;
-      const int steps = (int)(alertBreathMax - alertBreathMin) * 2;
-      alertBreathStepMs = (unsigned long)((periodVal * 1000.0f) / (float)steps);
-      if (alertBreathStepMs < 1) alertBreathStepMs = 1;
-      targetAlertActive     = true;
-      alertBreathBrightness = alertBreathMin;
-      alertBreathGoingUp    = true;
-      alertBreathLastStepMs = millis();
-      showSolid(CRGB::Yellow);
-    }
-  }
-  server.send(200, "application/json", "{\"ok\":true}");
 }
 
 void handleRoot() {
@@ -563,40 +807,38 @@ void handleState() {
 }
 
 void handleIncrement() {
-  if (!hasReachedTarget()) {
-    applyCounterChange(counter + 1, "Manual +1");
+  if (isScoringMode) {
+    scoringMode_handleIncrement();
+  } else {
+    countingMode_handleIncrement();
   }
   server.send(200, "application/json", stateJson());
 }
 
 void handleDecrement() {
-  if (counter > 0) {
-    applyCounterChange(counter - 1, "Manual -1");
+  if (isScoringMode) {
+    scoringMode_handleDecrement();
+  } else {
+    countingMode_handleDecrement();
   }
   server.send(200, "application/json", stateJson());
 }
 
 void handleReset() {
-  applyCounterChange(0, "Reset");
+  if (isScoringMode) {
+    scoringMode_handleReset();
+  } else {
+    countingMode_handleReset();
+  }
   server.send(200, "application/json", stateJson());
 }
 
 void handleSetTarget() {
-  if (server.hasArg("target")) {
-    const long value = server.arg("target").toInt();
-    targetCount = static_cast<int>(value < 0 ? 0 : value);
-  }
-
-  if (targetCount > 0 && counter == static_cast<unsigned long>(targetCount)) {
-    startTargetAlert();
+  if (isScoringMode) {
+    scoringMode_handleSetTarget();
   } else {
-    targetAlertActive = false;
-    FastLED.setBrightness(80);
-    renderBaseColor();
+    countingMode_handleSetTarget();
   }
-
-  Serial.print("Target set: ");
-  Serial.println(targetCount);
   server.send(200, "application/json", stateJson());
 }
 
@@ -604,13 +846,27 @@ void setup() {
   FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, NUM_LEDS);
   FastLED.setBrightness(150);
   showSolid(CRGB::Black);
+  pendingCountSync = true;
 
   pinMode(SENSOR_PIN, INPUT_PULLUP);
   Serial.begin(115200);
   delay(10);
   lastSensorState = digitalRead(SENSOR_PIN);
 
-  WiFi.softAP(AP_SSID, AP_PASSWORD);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  Serial.println();
+  Serial.print("Connecting to Wi-Fi: ");
+  Serial.println(WIFI_SSID);
+
+  unsigned long wifiStartMs = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - wifiStartMs < 15000) {
+    delay(300);
+    Serial.print(".");
+  }
+
+  Serial.println();
 
   server.on("/", handleRoot);
   server.on("/state", handleState);
@@ -618,30 +874,33 @@ void setup() {
   server.on("/decrement", HTTP_POST, handleDecrement);
   server.on("/reset", HTTP_POST, handleReset);
   server.on("/set-target", HTTP_POST, handleSetTarget);
-  server.on("/led-test/set-color", HTTP_POST, handleLedTestSetColor);
-  server.on("/led-test/set-final", HTTP_POST, handleLedTestSetFinal);
   server.begin();
 
-  Serial.println();
-  Serial.println("Wi-Fi AP started");
-  Serial.print("SSID: ");
-  Serial.println(AP_SSID);
-  Serial.print("Password: ");
-  Serial.println(AP_PASSWORD);
-  Serial.print("Open: http://");
-  Serial.println(WiFi.softAPIP());
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("Wi-Fi connected");
+    Serial.print("ESP32 IP: http://");
+    Serial.println(WiFi.localIP());
+    Serial.print("Central host: ");
+    Serial.println(SERVER_BASE_URL);
+    Serial.print("Team ID: ");
+    Serial.println(TEAM_ID);
+    sendHeartbeat(true, true);
+    fetchRemoteState(true);
+  } else {
+    Serial.println("Wi-Fi connection failed");
+    Serial.println("Please check SSID/password or router signal.");
+  }
 }
 
 void loop() {
   server.handleClient();
-  refreshTargetAlert();
+  ensureWifiConnected();
+  sendHeartbeat(false, false);
+  fetchRemoteState(false);
 
-  const int sensorState = digitalRead(SENSOR_PIN);
-
-  if (lastSensorState == HIGH && sensorState == LOW && !hasReachedTarget()) {
-    applyCounterChange(counter + 1, "Sensor +1");
-    delay(50);
+  if (isScoringMode) {
+    scoringMode_refreshLoop();
+  } else {
+    countingMode_refreshLoop();
   }
-
-  lastSensorState = sensorState;
 }

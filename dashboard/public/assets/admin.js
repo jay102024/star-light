@@ -15,6 +15,7 @@ const leaderboardList = document.getElementById('leaderboardList');
 let teams = [];
 let mode = null;
 const targetDrafts = {};
+const scoreDrafts = {};
 
 bootstrap();
 
@@ -176,7 +177,6 @@ function renderScoringGrid() {
     <article class="team-card score-card">
       <div class="team-top">
         <div>
-          <p class="eyebrow">${escapeHtml(team.id)}</p>
           <h3>${escapeHtml(team.name)}</h3>
         </div>
         <div class="status-stack">
@@ -191,11 +191,72 @@ function renderScoringGrid() {
         <button class="brand-button team-delta-button" type="button" data-team-delta-id="${team.id}" data-team-delta="1">+1</button>
         <button class="danger-button team-reset-button" type="button" data-team-reset-id="${team.id}">歸零</button>
       </div>
+      <form class="target-form score-form" data-score-team-id="${team.id}">
+        <input name="score" type="number" min="0" step="1" placeholder="${team.scoreCount}">
+        <button class="brand-button" type="submit">設定</button>
+      </form>
     </article>
   `).join('');
 
   attachDeltaListeners();
   attachResetListeners();
+  attachScoreFormListeners();
+}
+
+function attachScoreFormListeners() {
+  teamGrid.querySelectorAll('[data-score-team-id]').forEach((form) => {
+    const teamId = form.dataset.scoreTeamId;
+    const input = form.querySelector('input[name="score"]');
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const scoreValue = input.value.trim();
+      if (scoreValue === '') { return; }
+
+      const nextScore = Number(scoreValue);
+      if (!Number.isFinite(nextScore) || nextScore < 0) {
+        window.alert('請輸入 0 以上的分數。');
+        return;
+      }
+
+      try {
+        let response = await fetch(`/api/teams/${teamId}/score`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ score: nextScore })
+        });
+
+        // Backward compatibility: if server wasn't restarted and /score is missing,
+        // fall back to delta updates via /count.
+        if (!response.ok && response.status === 404) {
+          const currentTeam = teams.find((team) => team.id === teamId);
+          const currentScore = currentTeam ? Number(currentTeam.scoreCount || 0) : 0;
+          const delta = nextScore - currentScore;
+
+          response = await fetch(`/api/teams/${teamId}/count`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ delta })
+          });
+        }
+
+        if (!response.ok) {
+          throw new Error('Set score request failed');
+        }
+
+        const data = await response.json();
+        if (data.team) {
+          teams = teams.map((t) => (t.id === teamId ? data.team : t));
+        }
+
+        input.value = '';
+        render();
+      } catch (error) {
+        console.error(error);
+        window.alert('設定分數失敗，請稍後再試。');
+      }
+    });
+  });
 }
 
 function renderLeaderboard() {
@@ -210,7 +271,6 @@ function renderLeaderboard() {
       <div class="leaderboard-rank">#${index + 1}</div>
       <div class="leaderboard-meta">
         <p>${escapeHtml(team.name)}</p>
-        <span>${escapeHtml(team.id)}</span>
       </div>
       <div class="leaderboard-score">${team.scoreCount} 分</div>
     </article>
@@ -222,7 +282,6 @@ function renderBanquetGrid() {
     <article class="team-card">
       <div class="team-top">
         <div>
-          <p class="eyebrow">${escapeHtml(team.id)}</p>
           <h3>${escapeHtml(team.name)}</h3>
         </div>
         <div class="status-stack">
@@ -340,13 +399,20 @@ function attachDeltaListeners() {
 }
 
 function isEditingTargetInput() {
-  return document.activeElement && document.activeElement.matches('input[name="target"]');
+  return document.activeElement &&
+    document.activeElement.matches('input[name="target"], input[name="score"]');
 }
 
 function getDraftOrTeamTarget(team) {
   return Object.prototype.hasOwnProperty.call(targetDrafts, team.id)
     ? targetDrafts[team.id]
     : String(team.target);
+}
+
+function getDraftOrTeamScore(team) {
+  return Object.prototype.hasOwnProperty.call(scoreDrafts, team.id)
+    ? scoreDrafts[team.id]
+    : String(team.scoreCount);
 }
 
 async function resetAllCountsAndReload() {

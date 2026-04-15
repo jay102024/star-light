@@ -49,7 +49,6 @@ function renderScoring() {
         <div class="lb-rank">#${index + 1}</div>
         <div class="lb-meta">
           <strong>${escapeHtml(team.name)}</strong>
-          <span>${escapeHtml(team.id)}</span>
         </div>
         <div class="lb-score">${team.scoreCount}<span class="lb-unit"> 分</span></div>
       </article>
@@ -72,7 +71,6 @@ function renderBanquet() {
       <article class="lb-row ${done ? 'lb-done' : ''}">
         <div class="lb-meta">
           <strong>${escapeHtml(team.name)}</strong>
-          <span>${escapeHtml(team.id)}</span>
         </div>
         <div class="lb-progress-wrap">
           <div class="lb-progress-bar" style="width:${pct}%"></div>

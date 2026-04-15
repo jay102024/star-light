@@ -93,6 +93,18 @@ app.post('/api/teams/:teamId/count', (req, res) => {
   return res.json({ team: serializeTeam(team) });
 });
 
+app.post('/api/teams/:teamId/score', (req, res) => {
+  const team = findTeam(req.params.teamId);
+  if (!team) {
+    return res.status(404).json({ error: 'Team not found' });
+  }
+
+  team.scoreCount = Math.max(0, normalizeNumber(req.body.score));
+  team.updatedAt = Date.now();
+  publishState();
+  return res.json({ team: serializeTeam(team) });
+});
+
 app.post('/api/teams/:teamId/reset', (req, res) => {
   const team = findTeam(req.params.teamId);
   if (!team) {
@@ -127,9 +139,12 @@ app.get('/api/teams/:teamId/state', (req, res) => {
     return res.status(404).json({ error: 'Team not found' });
   }
 
+  const activeCount = state.mode === 'scoring' ? team.scoreCount : team.count;
+
   return res.json({
     id: team.id,
-    count: team.count,
+    mode: state.mode,
+    count: activeCount,
     target: team.target,
     testLightSeq: normalizeNumber(team.testLightSeq),
     updatedAt: team.updatedAt

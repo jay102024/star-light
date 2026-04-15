@@ -52,7 +52,6 @@ function render() {
     <button class="team-card selectable" type="button" data-team-id="${team.id}">
       <div class="team-top">
         <div>
-          <p class="eyebrow">${escapeHtml(team.id)}</p>
           <h3>${escapeHtml(team.name)}</h3>
         </div>
         <span class="pill ${team.deviceOnline ? 'online' : 'offline'}">${team.deviceOnline ? '設備在線' : '設備離線'}</span>

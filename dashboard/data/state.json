@@ -4,14 +4,14 @@
     {
       "id": "team-1",
       "name": "第 1 桌",
-      "count": 0,
-      "scoreCount": 0,
-      "target": 0,
-      "testLightSeq": 1,
+      "count": 3,
+      "scoreCount": 6,
+      "target": 10,
+      "testLightSeq": 12,
       "deviceId": "esp32-table-1",
-      "deviceLastSeenAt": 1776088939576,
-      "clientLastSeenAt": 1776253134510,
-      "updatedAt": 1776253153150
+      "deviceLastSeenAt": 1776263957462,
+      "clientLastSeenAt": 1776263947456,
+      "updatedAt": 1776263957462
     },
     {
       "id": "team-2",
@@ -22,8 +22,8 @@
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 1776251187647,
-      "updatedAt": 1776253142606
+      "clientLastSeenAt": 0,
+      "updatedAt": 1776263850795
     },
     {
       "id": "team-3",
@@ -34,8 +34,8 @@
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 1776253040646,
-      "updatedAt": 1776253142606
+      "clientLastSeenAt": 0,
+      "updatedAt": 1776263850795
     },
     {
       "id": "team-4",
@@ -46,8 +46,8 @@
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 1776252392540,
-      "updatedAt": 1776253142606
+      "clientLastSeenAt": 0,
+      "updatedAt": 1776263850795
     },
     {
       "id": "team-5",
@@ -58,8 +58,8 @@
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 1776253038528,
-      "updatedAt": 1776253142606
+      "clientLastSeenAt": 0,
+      "updatedAt": 1776263850795
     },
     {
       "id": "team-6",
@@ -70,8 +70,8 @@
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 1776253042187,
-      "updatedAt": 1776253142606
+      "clientLastSeenAt": 0,
+      "updatedAt": 1776263850795
     },
     {
       "id": "team-7",
@@ -82,8 +82,8 @@
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 1776253044189,
-      "updatedAt": 1776253142606
+      "clientLastSeenAt": 0,
+      "updatedAt": 1776263850795
     },
     {
       "id": "team-8",
@@ -94,8 +94,8 @@
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 1776253045564,
-      "updatedAt": 1776253142606
+      "clientLastSeenAt": 0,
+      "updatedAt": 1776263850795
     },
     {
       "id": "team-9",
@@ -106,8 +106,8 @@
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 1776253048008,
-      "updatedAt": 1776253142606
+      "clientLastSeenAt": 0,
+      "updatedAt": 1776263850795
     },
     {
       "id": "team-10",
@@ -118,8 +118,8 @@
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 1776253049282,
-      "updatedAt": 1776253142606
+      "clientLastSeenAt": 0,
+      "updatedAt": 1776263850795
     },
     {
       "id": "team-11",
@@ -130,8 +130,8 @@
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 1776253050221,
-      "updatedAt": 1776253142606
+      "clientLastSeenAt": 0,
+      "updatedAt": 1776263850795
     },
     {
       "id": "team-12",
@@ -143,7 +143,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776253142606
+      "updatedAt": 1776263850795
     },
     {
       "id": "team-13",
@@ -154,8 +154,8 @@
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 1776251569324,
-      "updatedAt": 1776253142606
+      "clientLastSeenAt": 0,
+      "updatedAt": 1776263850795
     },
     {
       "id": "team-14",
@@ -166,8 +166,8 @@
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 1776251577956,
-      "updatedAt": 1776253142606
+      "clientLastSeenAt": 0,
+      "updatedAt": 1776263850795
     },
     {
       "id": "team-15",
@@ -179,7 +179,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776253142606
+      "updatedAt": 1776263850795
     },
     {
       "id": "team-16",
@@ -190,8 +190,8 @@
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 1776251571599,
-      "updatedAt": 1776253142606
+      "clientLastSeenAt": 0,
+      "updatedAt": 1776263850795
     },
     {
       "id": "team-17",
@@ -203,7 +203,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776253142606
+      "updatedAt": 1776263850795
     },
     {
       "id": "team-18",
@@ -214,8 +214,8 @@
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 1776251574087,
-      "updatedAt": 1776253142606
+      "clientLastSeenAt": 0,
+      "updatedAt": 1776263850795
     },
     {
       "id": "team-19",
@@ -227,7 +227,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776253142606
+      "updatedAt": 1776263850795
     },
     {
       "id": "team-20",
@@ -238,8 +238,8 @@
       "testLightSeq": 0,
       "deviceId": "",
       "deviceLastSeenAt": 0,
-      "clientLastSeenAt": 1776251575966,
-      "updatedAt": 1776253142606
+      "clientLastSeenAt": 0,
+      "updatedAt": 1776263850795
     }
   ]
 }
