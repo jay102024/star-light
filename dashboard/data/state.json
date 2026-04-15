@@ -9,7 +9,7 @@
       "deviceId": "esp32-table-1",
       "deviceLastSeenAt": 1776088939576,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776175252511
+      "updatedAt": 1776095896621
     },
     {
       "id": "team-2",
@@ -20,7 +20,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776175252511
+      "updatedAt": 1776095898769
     },
     {
       "id": "team-3",
@@ -31,7 +31,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776175252511
+      "updatedAt": 1776095902046
     },
     {
       "id": "team-4",
@@ -42,7 +42,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776175252511
+      "updatedAt": 1776095904550
     },
     {
       "id": "team-5",
@@ -53,7 +53,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776175252511
+      "updatedAt": 1776095908125
     },
     {
       "id": "team-6",
@@ -64,7 +64,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776175252511
+      "updatedAt": 1776089263064
     },
     {
       "id": "team-7",
@@ -75,7 +75,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776175252511
+      "updatedAt": 1776089263064
     },
     {
       "id": "team-8",
@@ -86,7 +86,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776175252511
+      "updatedAt": 1776089263064
     },
     {
       "id": "team-9",
@@ -97,7 +97,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776175252511
+      "updatedAt": 1776089263064
     },
     {
       "id": "team-10",
@@ -108,7 +108,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776175252511
+      "updatedAt": 1776089263064
     },
     {
       "id": "team-11",
@@ -119,7 +119,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776175252511
+      "updatedAt": 1776089263064
     },
     {
       "id": "team-12",
@@ -130,7 +130,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776175252511
+      "updatedAt": 1776089263064
     },
     {
       "id": "team-13",
@@ -141,7 +141,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776175252511
+      "updatedAt": 1776090197447
     },
     {
       "id": "team-14",
@@ -152,7 +152,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776175252511
+      "updatedAt": 1776090197447
     },
     {
       "id": "team-15",
@@ -163,7 +163,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776175252511
+      "updatedAt": 1776090197447
     },
     {
       "id": "team-16",
@@ -174,7 +174,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776175252511
+      "updatedAt": 1776090197447
     },
     {
       "id": "team-17",
@@ -185,7 +185,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776175252511
+      "updatedAt": 1776090197447
     },
     {
       "id": "team-18",
@@ -196,7 +196,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776175252511
+      "updatedAt": 1776090197447
     },
     {
       "id": "team-19",
@@ -207,7 +207,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776175252511
+      "updatedAt": 1776090197447
     },
     {
       "id": "team-20",
@@ -218,7 +218,7 @@
       "deviceId": "",
       "deviceLastSeenAt": 0,
       "clientLastSeenAt": 0,
-      "updatedAt": 1776175252511
+      "updatedAt": 1776090197447
     }
   ]
 }
