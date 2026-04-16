@@ -5,13 +5,13 @@
       "id": "team-1",
       "name": "第 1 桌",
       "count": 3,
-      "scoreCount": 6,
+      "scoreCount": 0,
       "target": 10,
       "testLightSeq": 12,
       "deviceId": "esp32-table-1",
       "deviceLastSeenAt": 1776263957462,
       "clientLastSeenAt": 1776263947456,
-      "updatedAt": 1776263957462
+      "updatedAt": 1776298728545
     },
     {
       "id": "team-2",

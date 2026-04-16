@@ -8,7 +8,7 @@
 #define LED_PIN 3   // WS2812 LED 的數據腳位
 #define NUM_LEDS 24
 
-//呼吸燈亮度在 26~28行調整，燈的亮度在404行調整
+
 CRGB leds[NUM_LEDS];
 
 const char* WIFI_SSID = "counter";
@@ -18,31 +18,31 @@ const char* TEAM_ID = "team-1";
 const char* DEVICE_ID = "esp32-table-1";
 
 WebServer server(80);
-volatile unsigned long counter = 0;
-int targetCount = 0;
-int lastSensorState = HIGH;
-unsigned long lastHeartbeatMs = 0;
-unsigned long lastWifiRetryMs = 0;
-unsigned long lastRemoteSyncMs = 0;
-unsigned long testLightEndMs = 0;
-long lastTestLightSeq = 0;
-bool pendingCountSync = false;
-bool isScoringMode = false;
-bool hasModeSync = false;
+volatile unsigned long counter = 0; //目前計數值
+int targetCount = 0; //目標值
+int lastSensorState = HIGH; // 上次的感測器狀態，預設為 HIGH（未被遮擋）
+unsigned long lastHeartbeatMs = 0; // 上次心跳的時間
+unsigned long lastWifiRetryMs = 0; // 上次重試 WiFi 連線的時間
+unsigned long lastRemoteSyncMs = 0; // 上次遠端同步的時間
+unsigned long testLightEndMs = 0; // 測試燈結束的時間
+long lastTestLightSeq = 0; // 上次測試燈序列
+bool pendingCountSync = false; // 是否有待同步的計數
+bool isScoringMode = false; // 是否處於計分模式
+bool hasModeSync = false; // 是否已同步模式
 
-constexpr unsigned long WIFI_RETRY_INTERVAL_MS = 5000;
-constexpr unsigned long HEARTBEAT_INTERVAL_MS = 5000;
-constexpr unsigned long REMOTE_SYNC_INTERVAL_MS = 1200;
-constexpr unsigned long TEST_LIGHT_DURATION_MS = 1200;
+constexpr unsigned long WIFI_RETRY_INTERVAL_MS = 5000; // Wi-Fi 連線重試間隔
+constexpr unsigned long HEARTBEAT_INTERVAL_MS = 5000; // 心跳間隔
+constexpr unsigned long REMOTE_SYNC_INTERVAL_MS = 1200; // 遠端同步間隔
+constexpr unsigned long TEST_LIGHT_DURATION_MS = 1200; // 測試燈持續時間
 
-bool targetAlertActive = false;
-uint8_t alertBreathBrightness = 80;
-bool alertBreathGoingUp = true;
-unsigned long alertBreathLastStepMs = 0;
+bool targetAlertActive = false; // 是否正在目標達成警示中
+uint8_t alertBreathBrightness = 180; // 呼吸燈亮度
+bool alertBreathGoingUp = true; // 呼吸燈亮度增減方向
+unsigned long alertBreathLastStepMs = 0; // 上次呼吸燈步進的時間
 
-constexpr unsigned long ALERT_BREATH_STEP_MS = 5;
-constexpr uint8_t ALERT_BREATH_MIN = 10;
-constexpr uint8_t ALERT_BREATH_MAX = 255;
+constexpr unsigned long ALERT_BREATH_STEP_MS = 10; // 呼吸燈步進間隔
+constexpr uint8_t ALERT_BREATH_MIN = 10; // 呼吸燈最小亮度
+constexpr uint8_t ALERT_BREATH_MAX = 255; // 呼吸燈最大亮度
 
 const CRGB COLOR_PALETTE[] = {
   CRGB::Lavender,
@@ -307,47 +307,51 @@ void triggerTestLight();
 void refreshTestLight();
 void runScoreRainbowLap();
 
+// 回傳目前 count / target 的 JSON 字串，供本機網頁輪詢 /state 使用
 String stateJson() {
   return "{\"count\":" + String(counter) + ",\"target\":" + String(targetCount) + "}";
 }
 
+// 確保 Wi-Fi 保持連線；若斷線且距上次重試已夠久，就重新連線
 void ensureWifiConnected() {
   if (WiFi.status() == WL_CONNECTED) {
-    return;
+    return;  // 已連線，不需要做任何事
   }
 
   const unsigned long now = millis();
   if (now - lastWifiRetryMs < WIFI_RETRY_INTERVAL_MS) {
-    return;
+    return;  // 還沒到重試間隔，等待
   }
 
-  lastWifiRetryMs = now;
+  lastWifiRetryMs = now;  // 記錄本次重試時間
   Serial.println("Wi-Fi disconnected, retrying...");
   WiFi.disconnect();
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 }
 
+// 手動從 JSON 字串解析指定欄位的整數值（避免引入重量級 JSON 函式庫）
+// 找不到欄位、或解析失敗時回傳 defaultValue
 long extractJsonLong(const String& json, const char* key, long defaultValue) {
-  const String pattern = String("\"") + key + "\":";
+  const String pattern = String("\"") + key + "\":";  // 目標欄位形式："key":
   const int start = json.indexOf(pattern);
   if (start < 0) {
-    return defaultValue;
+    return defaultValue;  // 找不到欄位
   }
 
-  int valueStart = start + pattern.length();
+  int valueStart = start + pattern.length();  // 跳過 key 部分，指向數值開頭
   while (valueStart < static_cast<int>(json.length()) &&
          (json[valueStart] == ' ' || json[valueStart] == '\t')) {
-    valueStart++;
+    valueStart++;  // 跳過空白
   }
 
   int valueEnd = valueStart;
   while (valueEnd < static_cast<int>(json.length()) &&
          (json[valueEnd] == '-' || (json[valueEnd] >= '0' && json[valueEnd] <= '9'))) {
-    valueEnd++;
+    valueEnd++;  // 找數值結束位置（支援負號）
   }
 
   if (valueEnd == valueStart) {
-    return defaultValue;
+    return defaultValue;  // 沒有任何數字字元
   }
 
   return json.substring(valueStart, valueEnd).toInt();
@@ -355,6 +359,8 @@ long extractJsonLong(const String& json, const char* key, long defaultValue) {
 
 // ===== SCORING MODE - INDEPENDENT FUNCTIONS =====
 
+// 套用從伺服器同步回來的計分狀態（count + target）
+// 若 count 有增加，觸發彩虹燈效
 void scoringMode_applyRemoteState(unsigned long newCount, int newTarget) {
   const unsigned long previous = counter;
   counter = newCount;
@@ -374,10 +380,11 @@ void scoringMode_applyRemoteState(unsigned long newCount, int newTarget) {
   }
 }
 
+// 處理本機計數變更（感測器或手動按鈕）並立即同步到伺服器
 void scoringMode_applyCounterChange(unsigned long newValue) {
   const unsigned long previous = counter;
   counter = newValue;
-  pendingCountSync = true;
+  pendingCountSync = true;  // 標記為待同步，heartbeat 會帶上 count
 
   Serial.print("Scoring Mode - Sensor/Manual +1 -> Count: ");
   Serial.println(counter);
@@ -392,9 +399,10 @@ void scoringMode_applyCounterChange(unsigned long newValue) {
   sendHeartbeat(true, true);
 }
 
+// 計分模式 LED 渲染：試亮中顯示白燈，其餘時間保持關燈
 void scoringMode_renderLedState() {
   if (testLightEndMs > millis()) {
-    FastLED.setBrightness(220);
+    FastLED.setBrightness(220);  // 試亮用高亮度
     showSolid(CRGB::White);
     return;
   }
@@ -405,64 +413,73 @@ void scoringMode_renderLedState() {
   showSolid(CRGB::Black);
 }
 
+// 讀取感測器；偵測到 HIGH->LOW 下降沿（有物體遮擋）時計分 +1
 void scoringMode_handleSensorInput() {
   const int sensorState = digitalRead(SENSOR_PIN);
 
-  if (lastSensorState == HIGH && sensorState == LOW) {
+  if (lastSensorState == HIGH && sensorState == LOW) {  // 下降沿觸發
     scoringMode_applyCounterChange(counter + 1);
-    delay(50);
+    delay(50);  // 簡易去彈跳
   }
 
-  lastSensorState = sensorState;
+  lastSensorState = sensorState;  // 更新狀態供下一輪比較
 }
 
+// 本機網頁「+1」按鈕觸發
 void scoringMode_handleIncrement() {
   scoringMode_applyCounterChange(counter + 1);
 }
 
+// 本機網頁「-1」按鈕觸發；counter 為 0 時不減
 void scoringMode_handleDecrement() {
   if (counter > 0) {
     counter--;
-    pendingCountSync = true;
+    pendingCountSync = true;  // 標記需要同步
     Serial.print("Scoring Mode - Manual -1 -> Count: ");
     Serial.println(counter);
     currentDisplayColor = (counter == 0) ? CRGB::Black : nextRandomColor();
     scoringMode_renderLedState();
-    sendHeartbeat(true, true);
+    sendHeartbeat(true, true);  // 立即同步到伺服器
   }
 }
 
+// 本機網頁「歸零」按鈕觸發：計分清 0
 void scoringMode_handleReset() {
   counter = 0;
-  pendingCountSync = true;
+  pendingCountSync = true;  // 標記需要同步
   Serial.println("Scoring Mode - Reset");
   currentDisplayColor = CRGB::Black;
   scoringMode_renderLedState();
-  sendHeartbeat(true, true);
+  sendHeartbeat(true, true);  // 立即同步到伺服器
 }
 
+// 本機網頁「設定目標」觸發（計分模式下目標為參考值，不阻擋計數）
 void scoringMode_handleSetTarget() {
   if (server.hasArg("target")) {
     const long value = server.arg("target").toInt();
-    targetCount = static_cast<int>(value < 0 ? 0 : value);
+    targetCount = static_cast<int>(value < 0 ? 0 : value);  // 不允許負值
     Serial.print("Scoring Mode - Target set: ");
     Serial.println(targetCount);
   }
 }
 
+// 計分模式主循環：每圈更新試亮、燈效、感測器
 void scoringMode_refreshLoop() {
-  refreshTestLight();
-  scoringMode_renderLedState();
-  scoringMode_handleSensorInput();
+  refreshTestLight();             // 試亮計時到期就關閉
+  scoringMode_renderLedState();   // 更新 LED 狀態
+  scoringMode_handleSensorInput(); // 讀取感測器
 }
 
 // ===== COUNTING MODE - INDEPENDENT FUNCTIONS =====
 
+// 套用從伺服器同步回來的餐會模式狀態（count + target）
+// 若此次同步剛好践到目標，觸發達標提示燈效
 void countingMode_applyRemoteState(unsigned long newCount, int newTarget) {
   const unsigned long previous = counter;
   counter = newCount;
   targetCount = newTarget < 0 ? 0 : newTarget;
 
+  // 只有「第一次刺穿目標」才觸發提示（previous != counter 防止重複醒）
   const bool banquetTargetReached = targetCount > 0 && counter == static_cast<unsigned long>(targetCount) && previous != counter;
 
   Serial.print("Counting Mode - Remote sync -> Count: ");
@@ -482,11 +499,13 @@ void countingMode_applyRemoteState(unsigned long newCount, int newTarget) {
   }
 }
 
+// 處理本機計數變更（感測器或手動按鈕）並立即同步
 void countingMode_applyCounterChange(unsigned long newValue) {
   const unsigned long previous = counter;
   counter = newValue;
-  pendingCountSync = true;
+  pendingCountSync = true;  // 標記待同步
 
+  // 同樣判斷是否剛好達標
   const bool banquetTargetReached = targetCount > 0 && counter == static_cast<unsigned long>(targetCount) && previous != counter;
 
   Serial.print("Counting Mode - Sensor/Manual +1 -> Count: ");
@@ -506,81 +525,88 @@ void countingMode_applyCounterChange(unsigned long newValue) {
   sendHeartbeat(true, true);
 }
 
+// 餐會模式 LED 渲染：優先順序 = 試亮 > 達標呼吸燈 > 常態底色
 void countingMode_renderLedState() {
   if (testLightEndMs > millis()) {
-    FastLED.setBrightness(220);
+    FastLED.setBrightness(220);  // 試亮用高亮度白燈
     showSolid(CRGB::White);
     return;
   }
 
   if (targetAlertActive) {
-    FastLED.setBrightness(alertBreathBrightness);
-    showSolid(CRGB::Yellow);
+    FastLED.setBrightness(alertBreathBrightness);  // 亮度由呼吸燈動畫機控制
+    showSolid(CRGB::Yellow);  // 達標 = 黃燈
     return;
   }
 
   FastLED.setBrightness(80);
-  renderBaseColor();
+  renderBaseColor();  // 顯示 currentDisplayColor
 }
 
+// 回傳目前是否已達標（計數模式中可阻擋感測器繼續觸發）
 bool countingMode_hasReachedTarget() {
   return targetCount > 0 && counter >= static_cast<unsigned long>(targetCount);
 }
 
+// 讀取感測器；未達標時空缺 HIGH->LOW 觸發 +1
 void countingMode_handleSensorInput() {
   const int sensorState = digitalRead(SENSOR_PIN);
 
-  if (lastSensorState == HIGH && sensorState == LOW && !countingMode_hasReachedTarget()) {
+  if (lastSensorState == HIGH && sensorState == LOW && !countingMode_hasReachedTarget()) {  // 達標後自動停止計數
     countingMode_applyCounterChange(counter + 1);
-    delay(50);
+    delay(50);  // 簡易去彈跳
   }
 
   lastSensorState = sensorState;
 }
 
+// 本機網頁「+1」按鈕；達標後不動作
 void countingMode_handleIncrement() {
   if (!countingMode_hasReachedTarget()) {
     countingMode_applyCounterChange(counter + 1);
   }
 }
 
+// 本機網頁「-1」按鈕；減少後若退出達標就關閉呼吸燈
 void countingMode_handleDecrement() {
   if (counter > 0) {
     counter--;
-    pendingCountSync = true;
+    pendingCountSync = true;  // 標記需要同步
     Serial.print("Counting Mode - Manual -1 -> Count: ");
     Serial.println(counter);
     if (counter != static_cast<unsigned long>(targetCount)) {
-      targetAlertActive = false;
+      targetAlertActive = false;  // 退出達標就關閉呼吸燈
       FastLED.setBrightness(80);
     }
     currentDisplayColor = (counter == 0) ? CRGB::Black : nextRandomColor();
     countingMode_renderLedState();
-    sendHeartbeat(true, true);
+    sendHeartbeat(true, true);  // 立即同步
   }
 }
 
+// 本機網頁「歸零」按鈕：計數清 0、關閉呼吸燈
 void countingMode_handleReset() {
   counter = 0;
-  pendingCountSync = true;
+  pendingCountSync = true;  // 標記需要同步
   Serial.println("Counting Mode - Reset");
-  targetAlertActive = false;
+  targetAlertActive = false;  // 關閉達標提示
   FastLED.setBrightness(80);
   currentDisplayColor = CRGB::Black;
   countingMode_renderLedState();
-  sendHeartbeat(true, true);
+  sendHeartbeat(true, true);  // 立即同步
 }
 
+// 本機網頁「設定目標」觸發；設定後若當前 count == target 就直接觸發提示
 void countingMode_handleSetTarget() {
   if (server.hasArg("target")) {
     const long value = server.arg("target").toInt();
-    targetCount = static_cast<int>(value < 0 ? 0 : value);
+    targetCount = static_cast<int>(value < 0 ? 0 : value);  // 不允許負值
     Serial.print("Counting Mode - Target set: ");
     Serial.println(targetCount);
   }
 
   if (targetCount > 0 && counter == static_cast<unsigned long>(targetCount)) {
-    startTargetAlert();
+    startTargetAlert();  // 目標和 count 相等，立即啟動提示
   } else {
     targetAlertActive = false;
     FastLED.setBrightness(80);
@@ -588,24 +614,28 @@ void countingMode_handleSetTarget() {
   }
 }
 
+// 餐會模式主循環：每圈更新試亮、呼吸燈、LED、感測器
 void countingMode_refreshLoop() {
-  refreshTestLight();
-  refreshTargetAlert();
-  countingMode_renderLedState();
-  countingMode_handleSensorInput();
+  refreshTestLight();              // 試亮計時到期就關閉
+  refreshTargetAlert();            // 更新呼吸燈亮度
+  countingMode_renderLedState();   // 更新 LED
+  countingMode_handleSensorInput(); // 讀取感測器
 }
 
+// 定期從伺服器拉取該框 state（mode、count、target、testLightSeq）
+// forceNow=true 時略過節流，立即執行
+// 防跟回舊値：若本地待同步且遠端回傳較小的小吐，保留本地値
 void fetchRemoteState(bool forceNow = false) {
   const unsigned long now = millis();
   if (!forceNow && now - lastRemoteSyncMs < REMOTE_SYNC_INTERVAL_MS) {
-    return;
+    return;  // 還沒到輪詢間隔
   }
 
   if (WiFi.status() != WL_CONNECTED) {
-    return;
+    return;  // 進入斷線不發請求
   }
 
-  lastRemoteSyncMs = now;
+  lastRemoteSyncMs = now;  // 記錄本次同步時間
 
   HTTPClient http;
   const String url = String(SERVER_BASE_URL) + "/api/teams/" + TEAM_ID + "/state";
@@ -613,38 +643,38 @@ void fetchRemoteState(bool forceNow = false) {
   const int statusCode = http.GET();
   if (statusCode < 200 || statusCode >= 300) {
     http.end();
-    return;
+    return;  // HTTP 錯誤直接放棄
   }
 
   const String body = http.getString();
   http.end();
 
   if (body.indexOf("\"mode\":\"scoring\"") >= 0) {
-    isScoringMode = true;
+    isScoringMode = true;   // 從回應確認模式為計分
     hasModeSync = true;
   } else if (body.indexOf("\"mode\":") >= 0) {
-    isScoringMode = false;
+    isScoringMode = false;  // 其他模式（banquet）
     hasModeSync = true;
   }
 
-  const long syncedCount = extractJsonLong(body, "count", static_cast<long>(counter));
-  const long syncedTarget = extractJsonLong(body, "target", static_cast<long>(targetCount));
-  const long syncedTestLightSeq = extractJsonLong(body, "testLightSeq", lastTestLightSeq);
+  const long syncedCount = extractJsonLong(body, "count", static_cast<long>(counter));       // 從 JSON 提取 count
+  const long syncedTarget = extractJsonLong(body, "target", static_cast<long>(targetCount)); // 從 JSON 提取 target
+  const long syncedTestLightSeq = extractJsonLong(body, "testLightSeq", lastTestLightSeq);   // 從 JSON 提取試亮序號
 
   if (syncedTestLightSeq > lastTestLightSeq) {
-    lastTestLightSeq = syncedTestLightSeq;
-    triggerTestLight();
+    lastTestLightSeq = syncedTestLightSeq;  // 更新已處理序號
+    triggerTestLight();  // 新序號代表管理床按了試亮
   }
 
   if (syncedCount < 0) {
-    return;
+    return;  // 異常値直接放棄
   }
 
   unsigned long mergedCount = static_cast<unsigned long>(syncedCount);
   if (pendingCountSync && mergedCount < counter) {
     // Local count changed recently and has not been confirmed by host yet.
     // Ignore stale lower remote count to avoid jumping back to 0 then +1.
-    mergedCount = counter;
+    mergedCount = counter;  // 保留本地小偀，避免畫面抗回
   }
 
   if (mergedCount != counter || static_cast<int>(syncedTarget) != targetCount) {
@@ -656,29 +686,32 @@ void fetchRemoteState(bool forceNow = false) {
   }
 }
 
+// 定期對伺服器報平安，帶上裝置識別與可選的 count
+// forceNow=true 略過間隔立即送
+// includeCount=true 或 pendingCountSync=true 時將 count 一起上傳
 void sendHeartbeat(bool forceNow = false, bool includeCount = false) {
   const unsigned long now = millis();
   if (!forceNow && now - lastHeartbeatMs < HEARTBEAT_INTERVAL_MS) {
-    return;
+    return;  // 還沒到間隔
   }
 
   if (WiFi.status() != WL_CONNECTED) {
-    return;
+    return;  // 進入斷線不發請求
   }
 
-  lastHeartbeatMs = now;
+  lastHeartbeatMs = now;  // 記錄本次報平安時間
 
   HTTPClient http;
   const String url = String(SERVER_BASE_URL) + "/api/devices/heartbeat";
   http.begin(url);
   http.addHeader("Content-Type", "application/json");
 
-  const bool shouldIncludeCount = includeCount || pendingCountSync;
+  const bool shouldIncludeCount = includeCount || pendingCountSync;  // 只要有待同步就帶 count
 
   const String payload =
       String("{\"teamId\":\"") + TEAM_ID +
       "\",\"deviceId\":\"" + DEVICE_ID +
-      (shouldIncludeCount ? String("\",\"count\":") + String(counter) : String()) +
+      (shouldIncludeCount ? String("\",\"count\":") + String(counter) : String()) +  // 有待同步才帶 count 欄位
       "}";
 
   const int statusCode = http.POST(payload);
@@ -686,14 +719,15 @@ void sendHeartbeat(bool forceNow = false, bool includeCount = false) {
     Serial.print("Heartbeat failed, status: ");
     Serial.println(statusCode);
   } else if (shouldIncludeCount) {
-    pendingCountSync = false;
+    pendingCountSync = false;  // 伺服器已確認，清除待同步旗標
   }
   http.end();
 }
 
+// 把所有燈珠設為同一顏色並更新輸出
 void showSolid(const CRGB& color) {
-  fill_solid(leds, NUM_LEDS, color);
-  FastLED.show();
+  fill_solid(leds, NUM_LEDS, color);  // 將所有燈珠填满指定顏色
+  FastLED.show();                     // 實際輸出到燈拰
 }
 
 void runScoreRainbowLap() {
@@ -711,101 +745,111 @@ void runScoreRainbowLap() {
   showSolid(CRGB::Black);
 }
 
+// 重新洗牌顏色順序並調整避免首色跟上次相同
 void shuffleColorOrder() {
-  for (size_t i = 0; i < COLOR_COUNT; i++) colorOrder[i] = i;
+  for (size_t i = 0; i < COLOR_COUNT; i++) colorOrder[i] = i;  // 初始化順序索引
   for (size_t i = COLOR_COUNT - 1; i > 0; i--) {
-    const size_t j = random(i + 1);
+    const size_t j = random(i + 1);  // 隨機挑一個交換位置
     const size_t tmp = colorOrder[i];
-    colorOrder[i] = colorOrder[j];
+    colorOrder[i] = colorOrder[j];   // 交換
     colorOrder[j] = tmp;
   }
-  // 避免重洗後第一個顏色與上一個相同
+  // 避免重洗後第一個顏色跟上一個相同
   if (lastColorIdx < COLOR_COUNT && colorOrder[0] == lastColorIdx && COLOR_COUNT > 1) {
     const size_t tmp = colorOrder[0];
-    colorOrder[0] = colorOrder[1];
+    colorOrder[0] = colorOrder[1];  // 把重複的首色跟第二色對調
     colorOrder[1] = tmp;
   }
-  colorOrderPos = 0;
+  colorOrderPos = 0;  // 重置取用位置
 }
 
+// 從洗牌後的顏色序列依序取出下一色；用完就重新洗牌
 CRGB nextRandomColor() {
   if (colorOrderPos >= COLOR_COUNT) {
-    shuffleColorOrder();
+    shuffleColorOrder();  // 序列用完，重新洗牌
   }
-  lastColorIdx = colorOrder[colorOrderPos++];
+  lastColorIdx = colorOrder[colorOrderPos++];  // 取出下一色索引並前進位置
   return COLOR_PALETTE[lastColorIdx];
 }
 
+// 啟動達標呼吸黃燈提示
 void startTargetAlert() {
   targetAlertActive = true;
-    alertBreathBrightness = ALERT_BREATH_MIN;
+    alertBreathBrightness = ALERT_BREATH_MIN;  // 從最暗開始呼吸
   alertBreathGoingUp = true;
   alertBreathLastStepMs = millis();
   FastLED.setBrightness(alertBreathBrightness);
-  showSolid(CRGB::Yellow);
+  showSolid(CRGB::Yellow);  // 黃燈代表達標
 }
 
+// 顯示 currentDisplayColor（常態底色）
 void renderBaseColor() {
   showSolid(currentDisplayColor);
 }
 
+// 設定試亮結束時間点（現在 + 持續時間）
 void triggerTestLight() {
-  testLightEndMs = millis() + TEST_LIGHT_DURATION_MS;
+  testLightEndMs = millis() + TEST_LIGHT_DURATION_MS;  // 設定到期時間
   Serial.println("Test light triggered");
 }
 
+// 每圈檢查試亮是否到期，到期就清零 testLightEndMs 讓燈效回覆常態
 void refreshTestLight() {
   if (testLightEndMs == 0) {
-    return;
+    return;  // 結束時間未設定、表示沒有在試亮
   }
 
   const unsigned long now = millis();
   if (now < testLightEndMs) {
-    return;
+    return;  // 還在試亮期間
   }
 
-  testLightEndMs = 0;
+  testLightEndMs = 0;  // 試亮結束，清零標記
 }
 
+// 每圈更新達標呼吸燈亮度（不斷小幅 +1/-1）
 void refreshTargetAlert() {
   if (testLightEndMs > millis()) {
-    return;
+    return;  // 試亮優先，暂時停止呼吸燈
   }
 
   if (!targetAlertActive) {
-    return;
+    return;  // 呼吸燈未啟動
   }
 
   const unsigned long now = millis();
 
   if (now - alertBreathLastStepMs >= ALERT_BREATH_STEP_MS) {
-    alertBreathLastStepMs = now;
+    alertBreathLastStepMs = now;  // 更新上次步進時間
     if (alertBreathGoingUp) {
       if (alertBreathBrightness < ALERT_BREATH_MAX) {
-        alertBreathBrightness++;
+        alertBreathBrightness++;  // 變亮
       } else {
-        alertBreathGoingUp = false;
+        alertBreathGoingUp = false;  // 到頂，改為變暗
       }
     } else {
       if (alertBreathBrightness > ALERT_BREATH_MIN) {
-        alertBreathBrightness--;
+        alertBreathBrightness--;  // 變暗
       } else {
-        alertBreathGoingUp = true;
+        alertBreathGoingUp = true;  // 到底，改為變亮
       }
     }
     FastLED.setBrightness(alertBreathBrightness);
-    FastLED.show();
+    FastLED.show();  // 立即更新 LED
   }
 }
 
+// HTTP 路由：回傳本機內建網頁
 void handleRoot() {
   server.send_P(200, "text/html; charset=utf-8", INDEX_HTML);
 }
 
+// HTTP 路由：回傳目前 count / target JSON
 void handleState() {
   server.send(200, "application/json", stateJson());
 }
 
+// HTTP 路由： +1 操作
 void handleIncrement() {
   if (isScoringMode) {
     scoringMode_handleIncrement();
@@ -815,6 +859,7 @@ void handleIncrement() {
   server.send(200, "application/json", stateJson());
 }
 
+// HTTP 路由： -1 操作
 void handleDecrement() {
   if (isScoringMode) {
     scoringMode_handleDecrement();
@@ -824,6 +869,7 @@ void handleDecrement() {
   server.send(200, "application/json", stateJson());
 }
 
+// HTTP 路由： 歸零操作
 void handleReset() {
   if (isScoringMode) {
     scoringMode_handleReset();
@@ -833,6 +879,7 @@ void handleReset() {
   server.send(200, "application/json", stateJson());
 }
 
+// HTTP 路由： 設定目標人數
 void handleSetTarget() {
   if (isScoringMode) {
     scoringMode_handleSetTarget();
@@ -842,18 +889,19 @@ void handleSetTarget() {
   server.send(200, "application/json", stateJson());
 }
 
+// 開機初始化：LED、感測器、Wi-Fi、HTTP 路由
 void setup() {
-  FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, NUM_LEDS);
+  FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, NUM_LEDS);  // 註冊 WS2812 燈拰
   FastLED.setBrightness(150);
-  showSolid(CRGB::Black);
-  pendingCountSync = true;
+  showSolid(CRGB::Black);    // 開機先全部燈烅
+  pendingCountSync = true;   // 開機就向伺服器同步一次
 
-  pinMode(SENSOR_PIN, INPUT_PULLUP);
+  pinMode(SENSOR_PIN, INPUT_PULLUP);  // 啟用內部上拉電阻
   Serial.begin(115200);
   delay(10);
-  lastSensorState = digitalRead(SENSOR_PIN);
+  lastSensorState = digitalRead(SENSOR_PIN);  // 記錄開機時初始感測器狀態
 
-  WiFi.mode(WIFI_STA);
+  WiFi.mode(WIFI_STA);  // 站點模式
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   Serial.println();
@@ -861,13 +909,14 @@ void setup() {
   Serial.println(WIFI_SSID);
 
   unsigned long wifiStartMs = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - wifiStartMs < 15000) {
+  while (WiFi.status() != WL_CONNECTED && millis() - wifiStartMs < 15000) {  // 最多等 15 秒
     delay(300);
     Serial.print(".");
   }
 
   Serial.println();
 
+  // 註冊 HTTP 路由
   server.on("/", handleRoot);
   server.on("/state", handleState);
   server.on("/increment", HTTP_POST, handleIncrement);
@@ -884,23 +933,24 @@ void setup() {
     Serial.println(SERVER_BASE_URL);
     Serial.print("Team ID: ");
     Serial.println(TEAM_ID);
-    sendHeartbeat(true, true);
-    fetchRemoteState(true);
+    sendHeartbeat(true, true);   // 開機立即報平安
+    fetchRemoteState(true);      // 開機立即同步狀態
   } else {
     Serial.println("Wi-Fi connection failed");
     Serial.println("Please check SSID/password or router signal.");
   }
 }
 
+// 主循環：每圈處理本機請求、Wi-Fi、heartbeat、遠端同步、模式循環
 void loop() {
-  server.handleClient();
-  ensureWifiConnected();
-  sendHeartbeat(false, false);
-  fetchRemoteState(false);
+  server.handleClient();        // 處理本機網頁連線
+  ensureWifiConnected();        // 斷線時自動重連
+  sendHeartbeat(false, false);  // 間隔報平安（預設不帶 count）
+  fetchRemoteState(false);      // 間隔拉取遠端狀態
 
   if (isScoringMode) {
-    scoringMode_refreshLoop();
+    scoringMode_refreshLoop();   // 計分模式每圈刷新
   } else {
-    countingMode_refreshLoop();
+    countingMode_refreshLoop();  // 餐會模式每圈刷新
   }
 }
