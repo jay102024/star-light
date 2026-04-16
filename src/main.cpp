@@ -409,7 +409,7 @@ void scoringMode_renderLedState() {
 
   // In scoring mode, keep LEDs off when no test light is active.
   currentDisplayColor = CRGB::Black;
-  FastLED.setBrightness(80);
+  FastLED.setBrightness(180);
   showSolid(CRGB::Black);
 }
 
@@ -492,7 +492,7 @@ void countingMode_applyRemoteState(unsigned long newCount, int newTarget) {
   } else {
     if (counter != static_cast<unsigned long>(targetCount)) {
       targetAlertActive = false;
-      FastLED.setBrightness(80);
+      FastLED.setBrightness(180);
     }
     currentDisplayColor = (counter == 0) ? CRGB::Black : nextRandomColor();
     countingMode_renderLedState();
@@ -516,7 +516,7 @@ void countingMode_applyCounterChange(unsigned long newValue) {
   } else {
     if (counter != static_cast<unsigned long>(targetCount)) {
       targetAlertActive = false;
-      FastLED.setBrightness(80);
+      FastLED.setBrightness(180);
     }
     currentDisplayColor = (counter == 0) ? CRGB::Black : nextRandomColor();
     countingMode_renderLedState();
@@ -539,7 +539,7 @@ void countingMode_renderLedState() {
     return;
   }
 
-  FastLED.setBrightness(80);
+  FastLED.setBrightness(180);
   renderBaseColor();  // 顯示 currentDisplayColor
 }
 
@@ -576,7 +576,7 @@ void countingMode_handleDecrement() {
     Serial.println(counter);
     if (counter != static_cast<unsigned long>(targetCount)) {
       targetAlertActive = false;  // 退出達標就關閉呼吸燈
-      FastLED.setBrightness(80);
+      FastLED.setBrightness(180);
     }
     currentDisplayColor = (counter == 0) ? CRGB::Black : nextRandomColor();
     countingMode_renderLedState();
@@ -590,7 +590,7 @@ void countingMode_handleReset() {
   pendingCountSync = true;  // 標記需要同步
   Serial.println("Counting Mode - Reset");
   targetAlertActive = false;  // 關閉達標提示
-  FastLED.setBrightness(80);
+  FastLED.setBrightness(180);
   currentDisplayColor = CRGB::Black;
   countingMode_renderLedState();
   sendHeartbeat(true, true);  // 立即同步
@@ -609,7 +609,7 @@ void countingMode_handleSetTarget() {
     startTargetAlert();  // 目標和 count 相等，立即啟動提示
   } else {
     targetAlertActive = false;
-    FastLED.setBrightness(80);
+    FastLED.setBrightness(180);
     countingMode_renderLedState();
   }
 }
@@ -732,13 +732,13 @@ void showSolid(const CRGB& color) {
 
 void runScoreRainbowLap() {
   // 24 LEDs (2x12 WS2812B in series): run one full rainbow cycle.
-  for (uint16_t baseHue = 0; baseHue < 256; baseHue += 8) {
+  for (uint16_t baseHue = 0; baseHue < 256; baseHue += 1) {
     for (uint8_t i = 0; i < NUM_LEDS; ++i) {
       const uint8_t hue = static_cast<uint8_t>(baseHue + (i * 256 / NUM_LEDS));
       leds[i] = CHSV(hue, 255, 180);
     }
     FastLED.show();
-    delay(10);
+    delay(3);
   }
 
   // Turn off immediately after rainbow completes.
@@ -892,7 +892,7 @@ void handleSetTarget() {
 // 開機初始化：LED、感測器、Wi-Fi、HTTP 路由
 void setup() {
   FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, NUM_LEDS);  // 註冊 WS2812 燈拰
-  FastLED.setBrightness(150);
+  FastLED.setBrightness(180);
   showSolid(CRGB::Black);    // 開機先全部燈烅
   pendingCountSync = true;   // 開機就向伺服器同步一次
 

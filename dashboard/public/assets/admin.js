@@ -89,13 +89,13 @@ function render(skipTeamGrid = false) {
   if (mode === 'scoring') {
     heroEyebrow.textContent = '計分模式';
     heroTitle.textContent = '各桌積分總覽';
-    heroCopy.textContent = '每枚硬幣投入增加 1 分。主畫面維持固定桌次位置，排行榜可另外查看。';
+    heroCopy.textContent = '';
     panelTitle.textContent = '固定桌次總覽';
     leaderboardButton.classList.remove('hidden');
   } else if (mode === 'banquet') {
     heroEyebrow.textContent = '圓滿餐會';
     heroTitle.textContent = '各桌連線與完成狀態';
-    heroCopy.textContent = '這個頁面只透過特殊網址進入。用來查看所有設備是否在線、各桌進度，並設定每桌目標人數。';
+    heroCopy.textContent = '';
     panelTitle.textContent = '桌次總覽';
     leaderboardButton.classList.add('hidden');
     hideLeaderboardOverlay();
@@ -123,10 +123,6 @@ function renderSummary() {
       <article class="summary-card">
         <span class="muted">設備在線</span>
         <strong>${onlineCount}</strong>
-      </article>
-      <article class="summary-card">
-        <span class="muted">目前有隊長操作</span>
-        <strong>${activeClientCount}</strong>
       </article>
       <article class="summary-card">
         <span class="muted">全場總積分</span>

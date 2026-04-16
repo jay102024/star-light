@@ -10,9 +10,13 @@ const incrementButton = document.getElementById('incrementButton');
 const decrementButton = document.getElementById('decrementButton');
 const changeTeamButton = document.getElementById('changeTeamButton');
 
+const scoringBlock = document.getElementById('scoringBlock');
+const clientMain = document.getElementById('clientMain');
+
 const TEAM_STORAGE_KEY = 'counter:selected-team';
 
 let teams = [];
+let mode = null;
 let selectedTeamId = localStorage.getItem(TEAM_STORAGE_KEY) || '';
 let presenceTimer = null;
 
@@ -22,6 +26,7 @@ async function bootstrap() {
   const response = await fetch('/api/bootstrap');
   const data = await response.json();
   teams = data.teams;
+  mode = data.mode;
   if (teams.some((team) => team.id === selectedTeamId)) {
     startPresencePing();
   } else {
@@ -33,6 +38,7 @@ async function bootstrap() {
   const socket = io();
   socket.on('state', (payload) => {
     teams = payload.teams;
+    mode = payload.mode;
     render();
   });
 }
@@ -48,6 +54,14 @@ changeTeamButton.addEventListener('click', () => {
 });
 
 function render() {
+  if (mode === 'scoring') {
+    scoringBlock.classList.remove('hidden');
+    clientMain.classList.add('hidden');
+    return;
+  }
+  scoringBlock.classList.add('hidden');
+  clientMain.classList.remove('hidden');
+
   teamPickerGrid.innerHTML = teams.map((team) => `
     <button class="team-card selectable" type="button" data-team-id="${team.id}">
       <div class="team-top">
