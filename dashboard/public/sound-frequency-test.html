@@ -23,31 +23,20 @@
       </div>
 
       <div class="preset-grid">
-        <button class="brand-button sound-preset" type="button" data-f1="1319" data-d1="100" data-f2="1568" data-d2="150">
-          預設 A: 1319-100ms / 1568-150ms
+        <button class="brand-button" type="button" id="coinSoundBtn">
+          🪙 投幣音效
         </button>
-        <button class="brand-button sound-preset" type="button" data-f1="988" data-d1="100" data-f2="1319" data-d2="400">
-          預設 B: 988-100ms / 1319-400ms
+        <button class="brand-button" type="button" id="starSoundBtn">
+          ⭐ 星光音效
         </button>
-        <button class="brand-button sound-preset" type="button" data-sequence="yes" data-sequence-json='{"freqs":[1047,0,1319,0,1568,0,2093,0],"durs":[120,156,120,156,120,156,250,325]}'>
-          預設 C: 旋律序列
+        <button class="brand-button" type="button" id="customSoundBtn">
+          🪙 鐵幣音效
         </button>
       </div>
 
-      <form id="soundForm" class="sound-form">
-        <div style="margin-bottom: 20px; padding: 15px; background: #f5f5f5; border-radius: 8px;">
-          <label for="notesCount">音符數量</label>
-          <input id="notesCount" name="notesCount" type="number" min="1" max="16" value="2">
-          <p style="font-size: 12px; color: #666; margin: 8px 0 0 0;">支援 1-16 個音符（可含靜音）</p>
-        </div>
-
-        <div id="sequenceInputs"></div>
-
-        <div class="sound-action-row">
-          <button class="brand-button" type="submit">送出客製化音效</button>
-          <a class="ghost-button" href="/test-J2E13412">回到測試中心</a>
-        </div>
-      </form>
+      <div class="sound-action-row">
+        <a class="ghost-button" href="/test-J2E13412">回到測試中心</a>
+      </div>
 
       <p id="soundStatus" class="sound-status">待命中</p>
     </section>

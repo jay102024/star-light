@@ -202,39 +202,13 @@ app.post('/api/teams/:teamId/test-buzzer', (req, res) => {
     return res.status(404).json({ error: 'Team not found' });
   }
 
-  // Support both legacy dual-tone and new sequence format
-  if (Array.isArray(req.body.frequencies) && Array.isArray(req.body.durations)) {
-    // Sequence format
-    const maxLen = 16;
-    const frequencies = req.body.frequencies.slice(0, maxLen).map(f => clampFrequency(f));
-    const durations = req.body.durations.slice(0, maxLen).map(d => clampDuration(d));
-    
-    console.log('[test-buzzer] Sequence received:', { frequencies, durations });
-    
-    team.testBeepSeq = normalizeNumber(team.testBeepSeq) + 1;
-    team.testBeepFrequencies = frequencies;
-    team.testBeepDurations = durations;
-    team.testBeepFrequencyOne = frequencies[0] || 0;
-    team.testBeepDurationOne = durations[0] || 0;
-    team.testBeepFrequencyTwo = frequencies.length > 1 ? frequencies[1] : 0;
-    team.testBeepDurationTwo = durations.length > 1 ? durations[1] : 0;
-  } else {
-    // Legacy dual-tone format
-    const frequencyOne = clampFrequency(req.body.frequencyOne);
-    const durationOne = clampDuration(req.body.durationOne);
-    const frequencyTwo = clampFrequency(req.body.frequencyTwo);
-    const durationTwo = clampDuration(req.body.durationTwo);
-
-    console.log('[test-buzzer] Legacy dual-tone:', { frequencyOne, durationOne, frequencyTwo, durationTwo });
-
-    team.testBeepSeq = normalizeNumber(team.testBeepSeq) + 1;
-    team.testBeepFrequencyOne = frequencyOne;
-    team.testBeepDurationOne = durationOne;
-    team.testBeepFrequencyTwo = frequencyTwo;
-    team.testBeepDurationTwo = durationTwo;
-    team.testBeepFrequencies = [frequencyOne, frequencyTwo];
-    team.testBeepDurations = [durationOne, durationTwo];
-  }
+  // Sound mode: 0 = coin, 1 = star, 2 = metal coin
+  const soundMode = Math.max(0, Math.min(2, Number(req.body.soundMode) || 0));
+  
+  console.log('[test-buzzer] Sound mode:', soundMode);
+  
+  team.testBeepSeq = normalizeNumber(team.testBeepSeq) + 1;
+  team.testBeepMode = soundMode;
   team.updatedAt = Date.now();
   publishState();
   return res.json({ team: serializeTeam(team) });
@@ -261,23 +235,7 @@ app.get('/api/teams/:teamId/state', (req, res) => {
     testLightFinalMax: clampFinalBrightnessMax(team.testLightFinalMax, clampFinalBrightnessMin(team.testLightFinalMin)),
     testLightFinalPeriodMs: clampFinalPeriodMs(team.testLightFinalPeriodMs),
     testBeepSeq: normalizeNumber(team.testBeepSeq),
-    testBeepCount: Array.isArray(team.testBeepFrequencies) ? team.testBeepFrequencies.length : 0,
-    ...(() => {
-      // Flatten frequency and duration arrays into individual fields for firmware parsing
-      const freqs = Array.isArray(team.testBeepFrequencies) ? team.testBeepFrequencies : [];
-      const durs = Array.isArray(team.testBeepDurations) ? team.testBeepDurations : [];
-      const result = {};
-      for (let i = 0; i < 16; i++) {
-        result[`testBeepFreq${i}`] = i < freqs.length ? clampFrequency(freqs[i]) : 0;
-        result[`testBeepDur${i}`] = i < durs.length ? clampDuration(durs[i]) : 0;
-      }
-      return result;
-    })(),
-    // Keep legacy fields for backward compatibility
-    testBeepFrequencyOne: clampFrequency(team.testBeepFrequencyOne),
-    testBeepDurationOne: clampDuration(team.testBeepDurationOne),
-    testBeepFrequencyTwo: clampFrequency(team.testBeepFrequencyTwo),
-    testBeepDurationTwo: clampDuration(team.testBeepDurationTwo),
+    testBeepMode: Math.max(0, Math.min(2, normalizeNumber(team.testBeepMode))),
     updatedAt: team.updatedAt
   });
 });
@@ -378,6 +336,7 @@ function createDefaultState() {
       testLightFinalMax: 255,
       testLightFinalPeriodMs: 9000,
       testBeepSeq: 0,
+      testBeepMode: 0,
       testBeepFrequencyOne: 1319,
       testBeepDurationOne: 100,
       testBeepFrequencyTwo: 1568,
@@ -459,6 +418,7 @@ function normalizeState(input) {
       testLightFinalMax: 255,
       testLightFinalPeriodMs: 9000,
       testBeepSeq: 0,
+      testBeepMode: 0,
       testBeepFrequencyOne: 1319,
       testBeepDurationOne: 100,
       testBeepFrequencyTwo: 1568,
@@ -540,7 +500,7 @@ function clampFrequency(value) {
 
 function clampDuration(value) {
   const normalized = normalizeNumber(value);
-  return Math.min(5000, Math.max(10, normalized || 100));
+  return Math.min(10000, Math.max(10, normalized || 100));
 }
 
 function normalizeLightTestMode(value) {

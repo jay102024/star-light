@@ -631,6 +631,9 @@ void stopScoreMelody();
 void refreshScoreMelody();
 void initBuzzerPwm();
 void buzzerWriteTone(uint16_t frequency);
+void playCoinSound();
+void playStarSound();
+void playMetalCoinSound();
 void printWifiStatusDetail();
 void scanAndPrintTargetSsid();
 
@@ -1121,26 +1124,22 @@ void fetchRemoteState(bool forceNow = false) {
   if (syncedTestBeepSeq > lastTestBeepSeq) {
     lastTestBeepSeq = syncedTestBeepSeq;  // 更新已處理序號
     
-    // Try to load full sequence from flattened fields
-    const long beepCount = extractJsonLong(body, "testBeepCount", 2);
-    const size_t count = static_cast<size_t>(constrain(beepCount, 1L, 16L));
+    // Extract sound mode from JSON
+    const long soundMode = extractJsonLong(body, "testBeepMode", 0);
     
-    activeMelodyLength = count;
-    for (size_t i = 0; i < count && i < MAX_MELODY_LENGTH; i++) {
-      String freqKey = String("testBeepFreq") + i;
-      String durKey = String("testBeepDur") + i;
-      const long freq = extractJsonLong(body, freqKey.c_str(), i == 0 ? SCORE_MELODY_NOTES[0] : (i == 1 ? SCORE_MELODY_NOTES[1] : 0));
-      const long dur = extractJsonLong(body, durKey.c_str(), i == 0 ? SCORE_MELODY_DURATIONS_MS[0] : SCORE_MELODY_DURATIONS_MS[1]);
-      
-      activeMelodyNotes[i] = static_cast<uint16_t>(freq < 20 && freq != 0 ? 20 : (freq > 20000 ? 20000 : freq));
-      activeMelodyDurationsMs[i] = static_cast<unsigned long>(dur < 10 ? 10 : (dur > 5000 ? 5000 : dur));
-    }
-    
-    scoreMelodyActive = true;
-    scoreMelodyIndex = 0;
-    scoreMelodyStepStartMs = millis();
-    if (activeMelodyLength > 0) {
-      buzzerWriteTone(activeMelodyNotes[0]);
+    // Call corresponding sound function based on mode
+    switch (soundMode) {
+      case 0:
+        playCoinSound();      // 投幣音
+        break;
+      case 1:
+        playStarSound();      // 星光音
+        break;
+      case 2:
+        playMetalCoinSound(); // 鐵幣音
+        break;
+      default:
+        break;
     }
   }
 
@@ -1254,6 +1253,42 @@ void buzzerWriteTone(uint16_t frequency) {
 #else
   ledcWriteTone(BUZZER_CHANNEL, frequency);
 #endif
+}
+
+// 音效 1：投幣音 (988-100ms, 1319-400ms)
+void playCoinSound() {
+  buzzerWriteTone(988);
+  delay(100);
+  buzzerWriteTone(1319);
+  delay(400);
+  buzzerWriteTone(0);
+}
+
+// 音效 2：星光音 (1047-120ms, 1319-120ms, 1568-120ms, 2093-250ms)
+// 使用非阻塞旋律系統，避免 delay() 阻塞主循環導致 LEDC 時鐘異常
+void playStarSound() {
+  activeMelodyNotes[0] = 1047;
+  activeMelodyNotes[1] = 1319;
+  activeMelodyNotes[2] = 1568;
+  activeMelodyNotes[3] = 2093;
+  activeMelodyDurationsMs[0] = 120;
+  activeMelodyDurationsMs[1] = 120;
+  activeMelodyDurationsMs[2] = 120;
+  activeMelodyDurationsMs[3] = 250;
+  activeMelodyLength = 4;
+  scoreMelodyActive = true;
+  scoreMelodyIndex = 0;
+  scoreMelodyStepStartMs = millis();
+  buzzerWriteTone(activeMelodyNotes[0]);
+}
+
+// 音效 3：鐵幣音 (1319-100ms, 1568-150ms)
+void playMetalCoinSound() {
+  buzzerWriteTone(1319);
+  delay(100);
+  buzzerWriteTone(1568);
+  delay(150);
+  buzzerWriteTone(0);
 }
 
 // 從第一個音開始播放得分旋律；若前一段尚未播完就直接重播
