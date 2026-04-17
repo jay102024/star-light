@@ -1,5 +1,6 @@
 ﻿#include <Arduino.h>
 #include <WiFi.h>
+#include <esp_wifi.h>
 #include <WebServer.h>
 #include <HTTPClient.h>
 #include <FastLED.h>
@@ -49,8 +50,8 @@ constexpr uint8_t ALERT_BREATH_MAX = 255; // 呼吸燈最大亮度
 constexpr uint8_t BUZZER_CHANNEL = 0; // ESP32 LEDC 聲音輸出通道
 constexpr uint8_t BUZZER_RESOLUTION = 8; // LEDC PWM 解析度
 
-const uint16_t SCORE_MELODY_NOTES[] = {988, 1319}; // 得分旋律頻率（Hz）
-const unsigned long SCORE_MELODY_DURATIONS_MS[] = {100, 400}; // 各音符持續時間（ms）
+const uint16_t SCORE_MELODY_NOTES[] = {1319, 1568}; // 得分旋律頻率（Hz）
+const unsigned long SCORE_MELODY_DURATIONS_MS[] = {100, 150}; // 各音符持續時間（ms）
 const size_t SCORE_MELODY_LENGTH = sizeof(SCORE_MELODY_NOTES) / sizeof(SCORE_MELODY_NOTES[0]);
 constexpr unsigned long SCORE_RAINBOW_DURATION_MS = 500; // 彩虹特效總時長（與旋律一致）
 
@@ -1099,11 +1100,14 @@ void sendHeartbeat(bool forceNow = false, bool includeCount = false) {
 
   const bool shouldIncludeCount = includeCount || pendingCountSync;  // 只要有待同步就帶 count
 
-  const String payload =
+  String payload =
       String("{\"teamId\":\"") + TEAM_ID +
       "\",\"deviceId\":\"" + DEVICE_ID +
-      (shouldIncludeCount ? String("\",\"count\":") + String(counter) : String()) +  // 有待同步才帶 count 欄位
-      "}";
+      "\"";
+  if (shouldIncludeCount) {
+    payload += String(",\"count\":") + String(counter);  // 有待同步才帶 count 欄位
+  }
+  payload += "}";
 
   const int statusCode = http.POST(payload);
   if (statusCode < 200 || statusCode >= 300) {
@@ -1400,10 +1404,16 @@ void setup() {
   lastSensorState = digitalRead(SENSOR_PIN);  // 記錄開機時初始感測器狀態
 
   WiFi.mode(WIFI_STA);  // 站點模式
+  esp_err_t protocolResult = esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G);  // 啟用 802.11b/g 協定
+  if (protocolResult == ESP_OK) {
+    Serial.println("Wi-Fi protocol locked to 802.11b");
+  } else {
+    Serial.printf("Failed to lock Wi-Fi protocol to 802.11b, err=%d\n", protocolResult);
+  }
   WiFi.persistent(false);
   WiFi.setSleep(false);
   WiFi.setAutoReconnect(true);
-  WiFi.setTxPower(WIFI_POWER_7dBm);  // 設定功率為 7dBm
+  WiFi.setTxPower(WIFI_POWER_13dBm);  // 設定功率為 13dBm
   scanAndPrintTargetSsid();
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
