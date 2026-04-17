@@ -6,6 +6,7 @@
 
 #define SENSOR_PIN 1  // KY-010 光遮斷傳感器的輸出腳位
 #define LED_PIN 3   // WS2812 LED 的數據腳位
+#define BUZZER_PIN 2  // 被動式蜂鳴器的訊號腳位
 #define NUM_LEDS 24
 
 
@@ -26,6 +27,7 @@ unsigned long lastWifiRetryMs = 0; // 上次重試 WiFi 連線的時間
 unsigned long lastRemoteSyncMs = 0; // 上次遠端同步的時間
 unsigned long testLightEndMs = 0; // 測試燈結束的時間
 long lastTestLightSeq = 0; // 上次測試燈序列
+long lastTestBeepSeq = 0; // 上次蜂鳴測試序列
 bool pendingCountSync = false; // 是否有待同步的計數
 bool isScoringMode = false; // 是否處於計分模式
 bool hasModeSync = false; // 是否已同步模式
@@ -43,6 +45,19 @@ unsigned long alertBreathLastStepMs = 0; // 上次呼吸燈步進的時間
 constexpr unsigned long ALERT_BREATH_STEP_MS = 10; // 呼吸燈步進間隔
 constexpr uint8_t ALERT_BREATH_MIN = 10; // 呼吸燈最小亮度
 constexpr uint8_t ALERT_BREATH_MAX = 255; // 呼吸燈最大亮度
+constexpr uint8_t BUZZER_CHANNEL = 0; // ESP32 LEDC 聲音輸出通道
+constexpr uint8_t BUZZER_RESOLUTION = 8; // LEDC PWM 解析度
+
+const uint16_t SCORE_MELODY_NOTES[] = {988, 1319}; // 得分旋律頻率（Hz）
+const unsigned long SCORE_MELODY_DURATIONS_MS[] = {100, 400}; // 各音符持續時間（ms）
+const size_t SCORE_MELODY_LENGTH = sizeof(SCORE_MELODY_NOTES) / sizeof(SCORE_MELODY_NOTES[0]);
+constexpr unsigned long SCORE_RAINBOW_DURATION_MS = 500; // 彩虹特效總時長（與旋律一致）
+
+bool scoreMelodyActive = false; // 得分旋律是否正在播放
+size_t scoreMelodyIndex = 0; // 目前播放到第幾個音符
+unsigned long scoreMelodyStepStartMs = 0; // 目前音符開始的時間
+bool scoreRainbowActive = false; // 得分彩虹特效是否正在播放
+unsigned long scoreRainbowStartMs = 0; // 得分彩虹特效開始時間
 
 const CRGB COLOR_PALETTE[] = {
   CRGB::Lavender,
@@ -193,6 +208,12 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       transform: translateY(0);
     }
 
+    .button.secondary {
+      margin-top: 10px;
+      width: 100%;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+    }
+
     .hint {
       margin: 18px 0 0;
       color: #d1d5db;
@@ -221,6 +242,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       <button id="decrementButton" class="button" type="button">-1</button>
       <button id="resetButton" class="button" type="button">歸零</button>
     </div>
+    <button id="beepButton" class="button secondary" type="button">測試蜂鳴器</button>
   </main>
 
   <script>
@@ -276,6 +298,20 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       }
     }
 
+    async function triggerBeep() {
+      const button = document.getElementById('beepButton');
+      button.disabled = true;
+      try {
+        await fetch('/beep', { method: 'POST' });
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setTimeout(() => {
+          button.disabled = false;
+        }, 200);
+      }
+    }
+
     document.getElementById('startButton').addEventListener('click', confirmTargetAndEnter);
     document.getElementById('welcomeTargetInput').addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
@@ -285,8 +321,272 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     document.getElementById('incrementButton').addEventListener('click', () => postAction('/increment'));
     document.getElementById('decrementButton').addEventListener('click', () => postAction('/decrement'));
     document.getElementById('resetButton').addEventListener('click', () => postAction('/reset'));
+    document.getElementById('beepButton').addEventListener('click', triggerBeep);
 
     fetchState();
+  </script>
+</body>
+</html>
+)rawliteral";
+
+const char STAR_NIGHT_HTML[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>星夜進度牆</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: #e5efff;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(83, 110, 255, 0.22), transparent 45%),
+        radial-gradient(circle at 80% 12%, rgba(45, 87, 255, 0.18), transparent 42%),
+        radial-gradient(circle at 50% 120%, rgba(17, 44, 133, 0.38), transparent 60%),
+        linear-gradient(180deg, #030514 0%, #070b1f 48%, #040811 100%);
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    header {
+      padding: 18px 18px 6px;
+      text-align: center;
+      position: relative;
+      z-index: 5;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.2rem, 2.2vw, 1.7rem);
+      letter-spacing: 0.08em;
+      color: #f4f8ff;
+      text-shadow: 0 0 18px rgba(141, 181, 255, 0.45);
+    }
+
+    .subtitle {
+      margin: 8px 0 0;
+      color: rgba(223, 236, 255, 0.82);
+      font-size: clamp(0.9rem, 1.6vw, 1rem);
+      letter-spacing: 0.02em;
+    }
+
+    .sky {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      isolation: isolate;
+    }
+
+    .cluster {
+      position: absolute;
+      width: 0;
+      height: 0;
+      transform: translate(-50%, -50%);
+    }
+
+    .big-star {
+      --size: clamp(14px, 1.8vw, 22px);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: var(--size);
+      height: var(--size);
+      transform: translate(-50%, -50%) rotate(45deg) scale(0.95);
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.04);
+      box-shadow: 0 0 0 rgba(255, 245, 183, 0.0);
+      transition: background 0.35s ease, box-shadow 0.35s ease, transform 0.35s ease;
+      opacity: 0.36;
+    }
+
+    .big-star::before,
+    .big-star::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 100%;
+      height: 100%;
+      border-radius: 4px;
+      transform: translate(-50%, -50%) rotate(45deg);
+      background: inherit;
+    }
+
+    .big-star.on {
+      background: linear-gradient(145deg, #fff4bf 0%, #ffd76b 100%);
+      box-shadow:
+        0 0 16px rgba(255, 227, 140, 0.85),
+        0 0 34px rgba(255, 201, 76, 0.5);
+      opacity: 1;
+      transform: translate(-50%, -50%) rotate(45deg) scale(1);
+    }
+
+    .small-star {
+      --size: clamp(5px, 0.75vw, 8px);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: var(--size);
+      height: var(--size);
+      transform: translate(-50%, -50%) rotate(45deg);
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.045);
+      opacity: 0.25;
+      transition: background 0.25s ease, opacity 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .small-star.on {
+      background: #d8e9ff;
+      opacity: 1;
+      box-shadow: 0 0 8px rgba(180, 217, 255, 0.72);
+    }
+
+    .status {
+      position: absolute;
+      right: 12px;
+      bottom: 12px;
+      z-index: 5;
+      font-size: clamp(0.85rem, 1.2vw, 0.95rem);
+      color: rgba(230, 241, 255, 0.86);
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(8, 14, 34, 0.65);
+      border: 1px solid rgba(169, 196, 255, 0.22);
+      backdrop-filter: blur(2px);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>圓滿餐會星夜進度</h1>
+    <p class="subtitle">每加入 1 人點亮 1 顆小星星；每滿 20 人點亮 1 顆大星星</p>
+  </header>
+
+  <main id="sky" class="sky"></main>
+  <div id="status" class="status">0 / 400 人</div>
+
+  <script>
+    const BIG_STAR_COUNT = 20;
+    const SMALL_PER_BIG = 20;
+    const TOTAL_SMALL = BIG_STAR_COUNT * SMALL_PER_BIG;
+
+    const skyEl = document.getElementById('sky');
+    const statusEl = document.getElementById('status');
+
+    // Simple deterministic random generator so star layout stays stable every reload.
+    function createRng(seed) {
+      let value = seed >>> 0;
+      return function () {
+        value = (1664525 * value + 1013904223) >>> 0;
+        return value / 4294967296;
+      };
+    }
+
+    const rng = createRng(0x7cafe001);
+    const smallStarEls = [];
+    const bigStarEls = [];
+
+    function clamp(v, min, max) {
+      return Math.min(max, Math.max(min, v));
+    }
+
+    function createCluster(cxPercent, cyPercent) {
+      const cluster = document.createElement('section');
+      cluster.className = 'cluster';
+      cluster.style.left = `${cxPercent}%`;
+      cluster.style.top = `${cyPercent}%`;
+
+      const big = document.createElement('div');
+      big.className = 'big-star';
+      cluster.appendChild(big);
+      bigStarEls.push(big);
+
+      for (let i = 0; i < SMALL_PER_BIG; i++) {
+        const s = document.createElement('div');
+        s.className = 'small-star';
+
+        const angle = rng() * Math.PI * 2;
+        const radius = 5 + rng() * 9;
+        const jitter = (rng() - 0.5) * 2.1;
+        const sx = Math.cos(angle) * radius + jitter;
+        const sy = Math.sin(angle) * radius + jitter;
+
+        s.style.left = `${sx}vmin`;
+        s.style.top = `${sy}vmin`;
+        cluster.appendChild(s);
+        smallStarEls.push(s);
+      }
+
+      skyEl.appendChild(cluster);
+    }
+
+    function buildSky() {
+      const cols = 5;
+      const rows = 4;
+      let index = 0;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const baseX = ((c + 0.5) / cols) * 100;
+          const baseY = ((r + 0.5) / rows) * 82 + 12;
+          const jitterX = (rng() - 0.5) * 6.5;
+          const jitterY = (rng() - 0.5) * 8;
+          const x = clamp(baseX + jitterX, 8, 92);
+          const y = clamp(baseY + jitterY, 16, 93);
+          createCluster(x, y);
+          index++;
+          if (index >= BIG_STAR_COUNT) {
+            return;
+          }
+        }
+      }
+    }
+
+    function applyProgress(count, target) {
+      const safeCount = Math.max(0, Math.min(TOTAL_SMALL, Number.isFinite(count) ? count : 0));
+
+      for (let i = 0; i < TOTAL_SMALL; i++) {
+        smallStarEls[i].classList.toggle('on', i < safeCount);
+      }
+
+      const litBigStars = Math.floor(safeCount / SMALL_PER_BIG);
+      for (let i = 0; i < BIG_STAR_COUNT; i++) {
+        bigStarEls[i].classList.toggle('on', i < litBigStars);
+      }
+
+      if (target > 0) {
+        statusEl.textContent = `${safeCount} / ${Math.min(target, TOTAL_SMALL)} 人`;
+      } else {
+        statusEl.textContent = `${safeCount} / ${TOTAL_SMALL} 人`;
+      }
+    }
+
+    async function fetchState() {
+      try {
+        const response = await fetch('/state');
+        const data = await response.json();
+        applyProgress(Number(data.count) || 0, Number(data.target) || 0);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    buildSky();
+    applyProgress(0, 0);
+    fetchState();
+    setInterval(fetchState, 500);
   </script>
 </body>
 </html>
@@ -306,6 +606,12 @@ CRGB nextRandomColor();
 void triggerTestLight();
 void refreshTestLight();
 void runScoreRainbowLap();
+void refreshScoreRainbow();
+void startScoreMelody();
+void stopScoreMelody();
+void refreshScoreMelody();
+void initBuzzerPwm();
+void buzzerWriteTone(uint16_t frequency);
 
 // 回傳目前 count / target 的 JSON 字串，供本機網頁輪詢 /state 使用
 String stateJson() {
@@ -376,6 +682,7 @@ void scoringMode_applyRemoteState(unsigned long newCount, int newTarget) {
   scoringMode_renderLedState();
 
   if (scoringIncrement) {
+    startScoreMelody();
     runScoreRainbowLap();
   }
 }
@@ -393,6 +700,7 @@ void scoringMode_applyCounterChange(unsigned long newValue) {
   scoringMode_renderLedState();
 
   if (newValue == previous + 1) {
+    startScoreMelody();
     runScoreRainbowLap();
   }
 
@@ -405,6 +713,10 @@ void scoringMode_renderLedState() {
     FastLED.setBrightness(220);  // 試亮用高亮度
     showSolid(CRGB::White);
     return;
+  }
+
+  if (scoreRainbowActive) {
+    return;  // 彩虹特效播放中時，不覆蓋畫面
   }
 
   // In scoring mode, keep LEDs off when no test light is active.
@@ -467,6 +779,7 @@ void scoringMode_handleSetTarget() {
 void scoringMode_refreshLoop() {
   refreshTestLight();             // 試亮計時到期就關閉
   scoringMode_renderLedState();   // 更新 LED 狀態
+  refreshScoreRainbow();          // 更新得分彩虹特效
   scoringMode_handleSensorInput(); // 讀取感測器
 }
 
@@ -520,6 +833,10 @@ void countingMode_applyCounterChange(unsigned long newValue) {
     }
     currentDisplayColor = (counter == 0) ? CRGB::Black : nextRandomColor();
     countingMode_renderLedState();
+  }
+
+  if (newValue == previous + 1) {
+    startScoreMelody();
   }
 
   sendHeartbeat(true, true);
@@ -622,7 +939,7 @@ void countingMode_refreshLoop() {
   countingMode_handleSensorInput(); // 讀取感測器
 }
 
-// 定期從伺服器拉取該框 state（mode、count、target、testLightSeq）
+// 定期從伺服器拉取該框 state（mode、count、target、testLightSeq、testBeepSeq）
 // forceNow=true 時略過節流，立即執行
 // 防跟回舊値：若本地待同步且遠端回傳較小的小吐，保留本地値
 void fetchRemoteState(bool forceNow = false) {
@@ -660,10 +977,16 @@ void fetchRemoteState(bool forceNow = false) {
   const long syncedCount = extractJsonLong(body, "count", static_cast<long>(counter));       // 從 JSON 提取 count
   const long syncedTarget = extractJsonLong(body, "target", static_cast<long>(targetCount)); // 從 JSON 提取 target
   const long syncedTestLightSeq = extractJsonLong(body, "testLightSeq", lastTestLightSeq);   // 從 JSON 提取試亮序號
+  const long syncedTestBeepSeq = extractJsonLong(body, "testBeepSeq", lastTestBeepSeq);       // 從 JSON 提取蜂鳴測試序號
 
   if (syncedTestLightSeq > lastTestLightSeq) {
     lastTestLightSeq = syncedTestLightSeq;  // 更新已處理序號
     triggerTestLight();  // 新序號代表管理床按了試亮
+  }
+
+  if (syncedTestBeepSeq > lastTestBeepSeq) {
+    lastTestBeepSeq = syncedTestBeepSeq;  // 更新已處理序號
+    startScoreMelody();  // 新序號代表管理端按了蜂鳴測試
   }
 
   if (syncedCount < 0) {
@@ -731,18 +1054,85 @@ void showSolid(const CRGB& color) {
 }
 
 void runScoreRainbowLap() {
-  // 24 LEDs (2x12 WS2812B in series): run one full rainbow cycle.
-  for (uint16_t baseHue = 0; baseHue < 256; baseHue += 1) {
-    for (uint8_t i = 0; i < NUM_LEDS; ++i) {
-      const uint8_t hue = static_cast<uint8_t>(baseHue + (i * 256 / NUM_LEDS));
-      leds[i] = CHSV(hue, 255, 180);
-    }
-    FastLED.show();
-    delay(3);
+  scoreRainbowActive = true;
+  scoreRainbowStartMs = millis();
+}
+
+void refreshScoreRainbow() {
+  if (!scoreRainbowActive) {
+    return;
   }
 
-  // Turn off immediately after rainbow completes.
-  showSolid(CRGB::Black);
+  const unsigned long now = millis();
+  const unsigned long elapsed = now - scoreRainbowStartMs;
+  if (elapsed >= SCORE_RAINBOW_DURATION_MS) {
+    scoreRainbowActive = false;
+    showSolid(CRGB::Black);
+    return;
+  }
+
+  const uint8_t baseHue = static_cast<uint8_t>((elapsed * 256UL) / SCORE_RAINBOW_DURATION_MS);
+  for (uint8_t i = 0; i < NUM_LEDS; ++i) {
+    const uint8_t hue = static_cast<uint8_t>(baseHue + (i * 256 / NUM_LEDS));
+    leds[i] = CHSV(hue, 255, 180);
+  }
+  FastLED.show();
+}
+
+// 初始化蜂鳴器 PWM，兼容 ESP32 Arduino Core 2.x/3.x
+void initBuzzerPwm() {
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 3)
+  ledcAttach(BUZZER_PIN, 2000, BUZZER_RESOLUTION);
+#else
+  ledcSetup(BUZZER_CHANNEL, 2000, BUZZER_RESOLUTION);
+  ledcAttachPin(BUZZER_PIN, BUZZER_CHANNEL);
+#endif
+}
+
+// 依 Core 版本以正確參數型式輸出指定頻率
+void buzzerWriteTone(uint16_t frequency) {
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 3)
+  ledcWriteTone(BUZZER_PIN, frequency);
+#else
+  ledcWriteTone(BUZZER_CHANNEL, frequency);
+#endif
+}
+
+// 從第一個音開始播放得分旋律；若前一段尚未播完就直接重播
+void startScoreMelody() {
+  scoreMelodyActive = true;
+  scoreMelodyIndex = 0;
+  scoreMelodyStepStartMs = millis();
+  buzzerWriteTone(SCORE_MELODY_NOTES[0]);
+}
+
+// 停止蜂鳴器輸出，並把旋律狀態重設回初始值
+void stopScoreMelody() {
+  buzzerWriteTone(0);
+  scoreMelodyActive = false;
+  scoreMelodyIndex = 0;
+  scoreMelodyStepStartMs = 0;
+}
+
+// 以非阻塞方式推進旋律，不用 delay 卡住主循環
+void refreshScoreMelody() {
+  if (!scoreMelodyActive) {
+    return;
+  }
+
+  const unsigned long now = millis();
+  if (now - scoreMelodyStepStartMs < SCORE_MELODY_DURATIONS_MS[scoreMelodyIndex]) {
+    return;
+  }
+
+  scoreMelodyIndex++;
+  if (scoreMelodyIndex >= SCORE_MELODY_LENGTH) {
+    stopScoreMelody();
+    return;
+  }
+
+  scoreMelodyStepStartMs = now;
+  buzzerWriteTone(SCORE_MELODY_NOTES[scoreMelodyIndex]);
 }
 
 // 重新洗牌顏色順序並調整避免首色跟上次相同
@@ -844,9 +1234,46 @@ void handleRoot() {
   server.send_P(200, "text/html; charset=utf-8", INDEX_HTML);
 }
 
+// HTTP 路由：回傳星夜進度牆頁面
+void handleStarNight() {
+  server.send_P(200, "text/html; charset=utf-8", STAR_NIGHT_HTML);
+}
+
 // HTTP 路由：回傳目前 count / target JSON
 void handleState() {
   server.send(200, "application/json", stateJson());
+}
+
+// HTTP 路由：手動測試蜂鳴器
+void handleBeep() {
+  stopScoreMelody();
+
+  uint16_t hz = 2200;
+  unsigned long durationMs = 400;
+
+  if (server.hasArg("hz")) {
+    const long value = server.arg("hz").toInt();
+    if (value >= 100 && value <= 8000) {
+      hz = static_cast<uint16_t>(value);
+    }
+  }
+
+  if (server.hasArg("ms")) {
+    const long value = server.arg("ms").toInt();
+    if (value >= 50 && value <= 3000) {
+      durationMs = static_cast<unsigned long>(value);
+    }
+  }
+
+  buzzerWriteTone(hz);
+  delay(durationMs);
+  buzzerWriteTone(0);
+
+  server.send(
+      200,
+      "application/json",
+      String("{\"ok\":true,\"hz\":") + String(hz) +
+          String(",\"ms\":") + String(durationMs) + String("}"));
 }
 
 // HTTP 路由： +1 操作
@@ -894,9 +1321,12 @@ void setup() {
   FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, NUM_LEDS);  // 註冊 WS2812 燈拰
   FastLED.setBrightness(180);
   showSolid(CRGB::Black);    // 開機先全部燈烅
-  pendingCountSync = true;   // 開機就向伺服器同步一次
+  pendingCountSync = false;  // 開機先以遠端狀態為準，避免覆寫遠端計分
 
   pinMode(SENSOR_PIN, INPUT_PULLUP);  // 啟用內部上拉電阻
+  pinMode(BUZZER_PIN, OUTPUT);  // 啟用蜂鳴器訊號腳位
+  initBuzzerPwm();
+  stopScoreMelody();
   Serial.begin(115200);
   delay(10);
   lastSensorState = digitalRead(SENSOR_PIN);  // 記錄開機時初始感測器狀態
@@ -918,7 +1348,10 @@ void setup() {
 
   // 註冊 HTTP 路由
   server.on("/", handleRoot);
+  server.on("/star_night", handleStarNight);
   server.on("/state", handleState);
+  server.on("/beep", HTTP_GET, handleBeep);
+  server.on("/beep", HTTP_POST, handleBeep);
   server.on("/increment", HTTP_POST, handleIncrement);
   server.on("/decrement", HTTP_POST, handleDecrement);
   server.on("/reset", HTTP_POST, handleReset);
@@ -933,8 +1366,8 @@ void setup() {
     Serial.println(SERVER_BASE_URL);
     Serial.print("Team ID: ");
     Serial.println(TEAM_ID);
-    sendHeartbeat(true, true);   // 開機立即報平安
-    fetchRemoteState(true);      // 開機立即同步狀態
+    fetchRemoteState(true);      // 開機先同步遠端狀態
+    sendHeartbeat(true, false);  // 再報平安（不主動上傳 count）
   } else {
     Serial.println("Wi-Fi connection failed");
     Serial.println("Please check SSID/password or router signal.");
@@ -945,8 +1378,9 @@ void setup() {
 void loop() {
   server.handleClient();        // 處理本機網頁連線
   ensureWifiConnected();        // 斷線時自動重連
-  sendHeartbeat(false, false);  // 間隔報平安（預設不帶 count）
   fetchRemoteState(false);      // 間隔拉取遠端狀態
+  sendHeartbeat(false, false);  // 間隔報平安（預設不帶 count）
+  refreshScoreMelody();         // 背景推進得分旋律
 
   if (isScoringMode) {
     scoringMode_refreshLoop();   // 計分模式每圈刷新
