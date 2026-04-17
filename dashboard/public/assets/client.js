@@ -71,7 +71,7 @@ function render() {
         <span class="pill ${team.deviceOnline ? 'online' : 'offline'}">${team.deviceOnline ? '設備在線' : '設備離線'}</span>
       </div>
       <div class="team-count">${team.count}/${team.target}</div>
-      <p class="team-note">${team.target > 0 ? `距離目標還差 ${team.remaining} 人` : '尚未設定目標人數'}</p>
+      <p class="team-note">${team.target > 0 ? `距離上限還差 ${team.remaining} 人` : '尚未設定人數上限'}</p>
     </button>
   `).join('');
 
@@ -100,12 +100,15 @@ function render() {
   targetValue.textContent = `/${activeTeam.target}`;
 
   if (activeTeam.target <= 0) {
-    teamStatus.textContent = '管理員尚未設定目標人數';
+    teamStatus.textContent = '管理員尚未設定人數上限';
   } else if (activeTeam.completed) {
-    teamStatus.textContent = `已達標，超過 ${Math.max(0, activeTeam.count - activeTeam.target)} 人`;
+    teamStatus.textContent = '已達人數上限';
   } else {
-    teamStatus.textContent = `距離目標還差 ${activeTeam.remaining} 人`;
+    teamStatus.textContent = `距離上限還差 ${activeTeam.remaining} 人`;
   }
+
+  incrementButton.disabled = activeTeam.target > 0 && activeTeam.count >= activeTeam.target;
+  decrementButton.disabled = activeTeam.count <= 0;
 }
 
 async function updateCount(delta) {

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>聲音頻率測試</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body class="test-body">
+  <main class="test-shell">
+    <section class="test-hero compact">
+      <p class="site-title">115年度星燈營</p>
+      <p class="eyebrow">Sound Frequency Test</p>
+      <h1>聲音頻率測試</h1>
+      <p class="hero-copy">先選一台目前在線上的機器，再把指定雙音音效送到那台機器的蜂鳴器播放。</p>
+    </section>
+
+    <section class="test-panel sound-panel">
+      <div class="sound-device-panel">
+        <p class="eyebrow">Online Devices</p>
+        <h2>選擇在線機器</h2>
+        <div id="soundDeviceList" class="sound-device-list"></div>
+      </div>
+
+      <div class="preset-grid">
+        <button class="brand-button sound-preset" type="button" data-f1="1319" data-d1="100" data-f2="1568" data-d2="150">
+          預設 A: 1319-100ms / 1568-150ms
+        </button>
+        <button class="brand-button sound-preset" type="button" data-f1="988" data-d1="100" data-f2="1319" data-d2="400">
+          預設 B: 988-100ms / 1319-400ms
+        </button>
+        <button class="brand-button sound-preset" type="button" data-sequence="yes" data-sequence-json='{"freqs":[1047,0,1319,0,1568,0,2093,0],"durs":[120,156,120,156,120,156,250,325]}'>
+          預設 C: 旋律序列
+        </button>
+      </div>
+
+      <form id="soundForm" class="sound-form">
+        <div style="margin-bottom: 20px; padding: 15px; background: #f5f5f5; border-radius: 8px;">
+          <label for="notesCount">音符數量</label>
+          <input id="notesCount" name="notesCount" type="number" min="1" max="16" value="2">
+          <p style="font-size: 12px; color: #666; margin: 8px 0 0 0;">支援 1-16 個音符（可含靜音）</p>
+        </div>
+
+        <div id="sequenceInputs"></div>
+
+        <div class="sound-action-row">
+          <button class="brand-button" type="submit">送出客製化音效</button>
+          <a class="ghost-button" href="/test-J2E13412">回到測試中心</a>
+        </div>
+      </form>
+
+      <p id="soundStatus" class="sound-status">待命中</p>
+    </section>
+  </main>
+
+  <script src="/assets/sound-frequency-test.js"></script>
+</body>
+</html>

@@ -290,13 +290,13 @@ function renderBanquetGrid() {
       </div>
       <div class="team-actions-row">
         <button class="ghost-button team-delta-button" type="button" data-team-delta-id="${team.id}" data-team-delta="-1">-1</button>
-        <button class="brand-button team-delta-button" type="button" data-team-delta-id="${team.id}" data-team-delta="1">+1</button>
+        <button class="brand-button team-delta-button" type="button" data-team-delta-id="${team.id}" data-team-delta="1" ${team.target > 0 && team.count >= team.target ? 'disabled' : ''}>+1</button>
         <button class="danger-button team-test-button" type="button" data-team-test-id="${team.id}">試亮</button>
         <button class="danger-button team-reset-button" type="button" data-team-reset-id="${team.id}">歸零</button>
       </div>
       <form class="target-form" data-team-id="${team.id}">
-        <input id="target-${team.id}" name="target" type="number" min="0" step="1" placeholder="目標人數" value="${escapeHtml(getDraftOrTeamTarget(team))}">
-        <button class="brand-button" type="submit">更新</button>
+        <input id="target-${team.id}" name="target" type="number" min="0" step="1" placeholder="人數上限" value="${escapeHtml(getDraftOrTeamTarget(team))}">
+        <button class="brand-button" type="submit">設定上限</button>
       </form>
     </article>
   `).join('');
@@ -384,6 +384,15 @@ function attachDeltaListeners() {
           body: JSON.stringify({ delta })
         });
         if (!response.ok) { throw new Error('Team count update failed'); }
+
+        if (mode !== 'scoring') {
+          const data = await response.json();
+          if (data.team) {
+            teams = teams.map((team) => (team.id === teamId ? data.team : team));
+            render();
+          }
+          return;
+        }
       } catch (error) {
         console.error(error);
         window.alert('加減分數失敗，請稍後再試。');

@@ -47,17 +47,32 @@ unsigned long alertBreathLastStepMs = 0; // 上次呼吸燈步進的時間
 constexpr unsigned long ALERT_BREATH_STEP_MS = 10; // 呼吸燈步進間隔
 constexpr uint8_t ALERT_BREATH_MIN = 10; // 呼吸燈最小亮度
 constexpr uint8_t ALERT_BREATH_MAX = 255; // 呼吸燈最大亮度
+constexpr uint8_t LIGHT_TEST_MODE_CLASSIC = 0;
+constexpr uint8_t LIGHT_TEST_MODE_SWITCH = 1;
+constexpr uint8_t LIGHT_TEST_MODE_FINAL = 2;
 constexpr uint8_t BUZZER_CHANNEL = 0; // ESP32 LEDC 聲音輸出通道
 constexpr uint8_t BUZZER_RESOLUTION = 8; // LEDC PWM 解析度
+
+unsigned long alertBreathStepMs = ALERT_BREATH_STEP_MS;
+uint8_t alertBreathMin = ALERT_BREATH_MIN;
+uint8_t alertBreathMax = ALERT_BREATH_MAX;
+
+uint8_t activeTestLightMode = LIGHT_TEST_MODE_CLASSIC;
+uint8_t testLightColorIndex = 0;
+uint8_t testLightBrightness = 220;
 
 const uint16_t SCORE_MELODY_NOTES[] = {1319, 1568}; // 得分旋律頻率（Hz）
 const unsigned long SCORE_MELODY_DURATIONS_MS[] = {100, 150}; // 各音符持續時間（ms）
 const size_t SCORE_MELODY_LENGTH = sizeof(SCORE_MELODY_NOTES) / sizeof(SCORE_MELODY_NOTES[0]);
 constexpr unsigned long SCORE_RAINBOW_DURATION_MS = 500; // 彩虹特效總時長（與旋律一致）
+constexpr size_t MAX_MELODY_LENGTH = 16;
 
 bool scoreMelodyActive = false; // 得分旋律是否正在播放
 size_t scoreMelodyIndex = 0; // 目前播放到第幾個音符
 unsigned long scoreMelodyStepStartMs = 0; // 目前音符開始的時間
+uint16_t activeMelodyNotes[MAX_MELODY_LENGTH] = {1319, 1568};
+unsigned long activeMelodyDurationsMs[MAX_MELODY_LENGTH] = {100, 150};
+size_t activeMelodyLength = SCORE_MELODY_LENGTH;
 bool scoreRainbowActive = false; // 得分彩虹特效是否正在播放
 unsigned long scoreRainbowStartMs = 0; // 得分彩虹特效開始時間
 
@@ -607,9 +622,11 @@ void renderBaseColor();
 CRGB nextRandomColor();
 void triggerTestLight();
 void refreshTestLight();
+uint8_t parseLightTestMode(const String& body);
 void runScoreRainbowLap();
 void refreshScoreRainbow();
 void startScoreMelody();
+void startCustomMelody(uint16_t frequencyOne, unsigned long durationOne, uint16_t frequencyTwo, unsigned long durationTwo);
 void stopScoreMelody();
 void refreshScoreMelody();
 void initBuzzerPwm();
@@ -779,8 +796,17 @@ void scoringMode_applyCounterChange(unsigned long newValue) {
 // 計分模式 LED 渲染：試亮中顯示白燈，其餘時間保持關燈
 void scoringMode_renderLedState() {
   if (testLightEndMs > millis()) {
-    FastLED.setBrightness(220);  // 試亮用高亮度
-    showSolid(CRGB::White);
+    if (activeTestLightMode == LIGHT_TEST_MODE_SWITCH) {
+      FastLED.setBrightness(testLightBrightness);
+      const size_t maxIndex = COLOR_COUNT > 0 ? (COLOR_COUNT - 1) : 0;
+      const size_t index = static_cast<size_t>(testLightColorIndex) > maxIndex ? maxIndex : static_cast<size_t>(testLightColorIndex);
+      showSolid(COLOR_PALETTE[index]);
+    } else if (activeTestLightMode == LIGHT_TEST_MODE_FINAL) {
+      showSolid(CRGB::Yellow);
+    } else {
+      FastLED.setBrightness(220);  // 維持舊版試亮
+      showSolid(CRGB::White);
+    }
     return;
   }
 
@@ -914,8 +940,17 @@ void countingMode_applyCounterChange(unsigned long newValue) {
 // 餐會模式 LED 渲染：優先順序 = 試亮 > 達標呼吸燈 > 常態底色
 void countingMode_renderLedState() {
   if (testLightEndMs > millis()) {
-    FastLED.setBrightness(220);  // 試亮用高亮度白燈
-    showSolid(CRGB::White);
+    if (activeTestLightMode == LIGHT_TEST_MODE_SWITCH) {
+      FastLED.setBrightness(testLightBrightness);
+      const size_t maxIndex = COLOR_COUNT > 0 ? (COLOR_COUNT - 1) : 0;
+      const size_t index = static_cast<size_t>(testLightColorIndex) > maxIndex ? maxIndex : static_cast<size_t>(testLightColorIndex);
+      showSolid(COLOR_PALETTE[index]);
+    } else if (activeTestLightMode == LIGHT_TEST_MODE_FINAL) {
+      showSolid(CRGB::Yellow);
+    } else {
+      FastLED.setBrightness(220);  // 維持舊版試亮
+      showSolid(CRGB::White);
+    }
     return;
   }
 
@@ -1047,15 +1082,66 @@ void fetchRemoteState(bool forceNow = false) {
   const long syncedTarget = extractJsonLong(body, "target", static_cast<long>(targetCount)); // 從 JSON 提取 target
   const long syncedTestLightSeq = extractJsonLong(body, "testLightSeq", lastTestLightSeq);   // 從 JSON 提取試亮序號
   const long syncedTestBeepSeq = extractJsonLong(body, "testBeepSeq", lastTestBeepSeq);       // 從 JSON 提取蜂鳴測試序號
+  const uint8_t syncedTestLightMode = parseLightTestMode(body);
+  const long syncedTestLightColorIndex = extractJsonLong(body, "testLightColorIndex", 0);
+  const long syncedTestLightBrightness = extractJsonLong(body, "testLightBrightness", 220);
+  const long syncedTestLightFinalMin = extractJsonLong(body, "testLightFinalMin", ALERT_BREATH_MIN);
+  const long syncedTestLightFinalMax = extractJsonLong(body, "testLightFinalMax", ALERT_BREATH_MAX);
+  const long syncedTestLightFinalPeriodMs = extractJsonLong(body, "testLightFinalPeriodMs", 9000);
+  const long syncedBeepFrequencyOne = extractJsonLong(body, "testBeepFrequencyOne", SCORE_MELODY_NOTES[0]);
+  const long syncedBeepDurationOne = extractJsonLong(body, "testBeepDurationOne", SCORE_MELODY_DURATIONS_MS[0]);
+  const long syncedBeepFrequencyTwo = extractJsonLong(body, "testBeepFrequencyTwo", SCORE_MELODY_NOTES[1]);
+  const long syncedBeepDurationTwo = extractJsonLong(body, "testBeepDurationTwo", SCORE_MELODY_DURATIONS_MS[1]);
 
   if (syncedTestLightSeq > lastTestLightSeq) {
     lastTestLightSeq = syncedTestLightSeq;  // 更新已處理序號
-    triggerTestLight();  // 新序號代表管理床按了試亮
+    activeTestLightMode = syncedTestLightMode;
+    testLightColorIndex = static_cast<uint8_t>(constrain(syncedTestLightColorIndex, 0, static_cast<long>(COLOR_COUNT - 1)));
+    testLightBrightness = static_cast<uint8_t>(constrain(syncedTestLightBrightness, 0, 255));
+
+    if (activeTestLightMode == LIGHT_TEST_MODE_FINAL) {
+      const int minBr = static_cast<int>(constrain(syncedTestLightFinalMin, 0, 254));
+      const int maxBr = static_cast<int>(constrain(syncedTestLightFinalMax, minBr + 1, 255));
+      const unsigned long periodMs = static_cast<unsigned long>(constrain(syncedTestLightFinalPeriodMs, 100L, 60000L));
+      const unsigned long steps = static_cast<unsigned long>(maxBr - minBr) * 2UL;
+
+      alertBreathMin = static_cast<uint8_t>(minBr);
+      alertBreathMax = static_cast<uint8_t>(maxBr);
+      alertBreathStepMs = steps > 0 ? max(1UL, periodMs / steps) : ALERT_BREATH_STEP_MS;
+
+      targetAlertActive = true;
+      alertBreathBrightness = alertBreathMin;
+      alertBreathGoingUp = true;
+      alertBreathLastStepMs = millis();
+    }
+
+    triggerTestLight();  // 新序號代表管理端觸發燈光測試
   }
 
   if (syncedTestBeepSeq > lastTestBeepSeq) {
     lastTestBeepSeq = syncedTestBeepSeq;  // 更新已處理序號
-    startScoreMelody();  // 新序號代表管理端按了蜂鳴測試
+    
+    // Try to load full sequence from flattened fields
+    const long beepCount = extractJsonLong(body, "testBeepCount", 2);
+    const size_t count = static_cast<size_t>(constrain(beepCount, 1L, 16L));
+    
+    activeMelodyLength = count;
+    for (size_t i = 0; i < count && i < MAX_MELODY_LENGTH; i++) {
+      String freqKey = String("testBeepFreq") + i;
+      String durKey = String("testBeepDur") + i;
+      const long freq = extractJsonLong(body, freqKey.c_str(), i == 0 ? SCORE_MELODY_NOTES[0] : (i == 1 ? SCORE_MELODY_NOTES[1] : 0));
+      const long dur = extractJsonLong(body, durKey.c_str(), i == 0 ? SCORE_MELODY_DURATIONS_MS[0] : SCORE_MELODY_DURATIONS_MS[1]);
+      
+      activeMelodyNotes[i] = static_cast<uint16_t>(freq < 20 && freq != 0 ? 20 : (freq > 20000 ? 20000 : freq));
+      activeMelodyDurationsMs[i] = static_cast<unsigned long>(dur < 10 ? 10 : (dur > 5000 ? 5000 : dur));
+    }
+    
+    scoreMelodyActive = true;
+    scoreMelodyIndex = 0;
+    scoreMelodyStepStartMs = millis();
+    if (activeMelodyLength > 0) {
+      buzzerWriteTone(activeMelodyNotes[0]);
+    }
   }
 
   if (syncedCount < 0) {
@@ -1172,10 +1258,29 @@ void buzzerWriteTone(uint16_t frequency) {
 
 // 從第一個音開始播放得分旋律；若前一段尚未播完就直接重播
 void startScoreMelody() {
+  activeMelodyLength = SCORE_MELODY_LENGTH;
+  for (size_t index = 0; index < SCORE_MELODY_LENGTH; index++) {
+    activeMelodyNotes[index] = SCORE_MELODY_NOTES[index];
+    activeMelodyDurationsMs[index] = SCORE_MELODY_DURATIONS_MS[index];
+  }
+
   scoreMelodyActive = true;
   scoreMelodyIndex = 0;
   scoreMelodyStepStartMs = millis();
-  buzzerWriteTone(SCORE_MELODY_NOTES[0]);
+  buzzerWriteTone(activeMelodyNotes[0]);
+}
+
+void startCustomMelody(uint16_t frequencyOne, unsigned long durationOne, uint16_t frequencyTwo, unsigned long durationTwo) {
+  activeMelodyLength = MAX_MELODY_LENGTH;
+  activeMelodyNotes[0] = frequencyOne;
+  activeMelodyDurationsMs[0] = durationOne;
+  activeMelodyNotes[1] = frequencyTwo;
+  activeMelodyDurationsMs[1] = durationTwo;
+
+  scoreMelodyActive = true;
+  scoreMelodyIndex = 0;
+  scoreMelodyStepStartMs = millis();
+  buzzerWriteTone(activeMelodyNotes[0]);
 }
 
 // 停止蜂鳴器輸出，並把旋律狀態重設回初始值
@@ -1193,18 +1298,18 @@ void refreshScoreMelody() {
   }
 
   const unsigned long now = millis();
-  if (now - scoreMelodyStepStartMs < SCORE_MELODY_DURATIONS_MS[scoreMelodyIndex]) {
+  if (now - scoreMelodyStepStartMs < activeMelodyDurationsMs[scoreMelodyIndex]) {
     return;
   }
 
   scoreMelodyIndex++;
-  if (scoreMelodyIndex >= SCORE_MELODY_LENGTH) {
+  if (scoreMelodyIndex >= activeMelodyLength) {
     stopScoreMelody();
     return;
   }
 
   scoreMelodyStepStartMs = now;
-  buzzerWriteTone(SCORE_MELODY_NOTES[scoreMelodyIndex]);
+  buzzerWriteTone(activeMelodyNotes[scoreMelodyIndex]);
 }
 
 // 重新洗牌顏色順序並調整避免首色跟上次相同
@@ -1251,7 +1356,11 @@ void renderBaseColor() {
 
 // 設定試亮結束時間点（現在 + 持續時間）
 void triggerTestLight() {
-  testLightEndMs = millis() + TEST_LIGHT_DURATION_MS;  // 設定到期時間
+  if (activeTestLightMode == LIGHT_TEST_MODE_FINAL) {
+    testLightEndMs = millis() + 9000UL;
+  } else {
+    testLightEndMs = millis() + TEST_LIGHT_DURATION_MS;  // 設定到期時間
+  }
   Serial.println("Test light triggered");
 }
 
@@ -1267,11 +1376,19 @@ void refreshTestLight() {
   }
 
   testLightEndMs = 0;  // 試亮結束，清零標記
+  if (activeTestLightMode == LIGHT_TEST_MODE_FINAL) {
+    targetAlertActive = false;
+    alertBreathMin = ALERT_BREATH_MIN;
+    alertBreathMax = ALERT_BREATH_MAX;
+    alertBreathStepMs = ALERT_BREATH_STEP_MS;
+    FastLED.setBrightness(180);
+  }
+  activeTestLightMode = LIGHT_TEST_MODE_CLASSIC;
 }
 
 // 每圈更新達標呼吸燈亮度（不斷小幅 +1/-1）
 void refreshTargetAlert() {
-  if (testLightEndMs > millis()) {
+  if (testLightEndMs > millis() && activeTestLightMode != LIGHT_TEST_MODE_FINAL) {
     return;  // 試亮優先，暂時停止呼吸燈
   }
 
@@ -1299,6 +1416,16 @@ void refreshTargetAlert() {
     FastLED.setBrightness(alertBreathBrightness);
     FastLED.show();  // 立即更新 LED
   }
+}
+
+uint8_t parseLightTestMode(const String& body) {
+  if (body.indexOf("\"testLightMode\":\"switch\"") >= 0) {
+    return LIGHT_TEST_MODE_SWITCH;
+  }
+  if (body.indexOf("\"testLightMode\":\"final\"") >= 0) {
+    return LIGHT_TEST_MODE_FINAL;
+  }
+  return LIGHT_TEST_MODE_CLASSIC;
 }
 
 // HTTP 路由：回傳本機內建網頁
@@ -1399,6 +1526,9 @@ void setup() {
   pinMode(BUZZER_PIN, OUTPUT);  // 啟用蜂鳴器訊號腳位
   initBuzzerPwm();
   stopScoreMelody();
+  alertBreathMin = ALERT_BREATH_MIN;
+  alertBreathMax = ALERT_BREATH_MAX;
+  alertBreathStepMs = ALERT_BREATH_STEP_MS;
   Serial.begin(115200);
   delay(10);
   lastSensorState = digitalRead(SENSOR_PIN);  // 記錄開機時初始感測器狀態

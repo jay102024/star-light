@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Star Night</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: #e6f0ff;
+      background:
+        url('/star_night.png') center bottom / auto 125vh no-repeat,
+        linear-gradient(180deg, #060d1f 0%, #07112a 40%, #050a18 70%, #030608 100%);
+      overflow: hidden;
+    }
+
+    .sky {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      isolation: isolate;
+    }
+
+    .cluster {
+      position: absolute;
+      width: 0;
+      height: 0;
+      transform: translate(-50%, -50%);
+    }
+
+    .big-star {
+      --size: clamp(28px, 3.2vw, 44px);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: var(--size);
+      height: var(--size);
+      transform: translate(-50%, -50%);
+      background: url('/big_star.png?v=2') center center / contain no-repeat;
+      opacity: 0;
+      transition: opacity 0.28s ease, transform 0.28s ease;
+    }
+
+    .big-star.on {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1.08);
+    }
+
+    .small-star {
+      --size: clamp(14px, 1.7vw, 22px);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: var(--size);
+      height: var(--size);
+      transform: translate(-50%, -50%);
+      background: url('/small_star.png') center center / contain no-repeat;
+      opacity: 0;
+      transition: opacity 0.22s ease;
+    }
+
+    .small-star.on {
+      opacity: 1;
+    }
+
+    .status {
+      position: absolute;
+      right: 12px;
+      bottom: 12px;
+      z-index: 5;
+      font-size: clamp(0.85rem, 1.2vw, 0.95rem);
+      color: rgba(230, 241, 255, 0.9);
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(8, 14, 34, 0.64);
+      border: 1px solid rgba(169, 196, 255, 0.22);
+      backdrop-filter: blur(2px);
+    }
+  </style>
+</head>
+<body>
+  <main id="sky" class="sky"></main>
+  <div id="status" class="status">0 / 400 人</div>
+
+  <script>
+    const BIG_STAR_COUNT = 20;
+    const SMALL_PER_BIG = 20;
+    const TOTAL_SMALL = BIG_STAR_COUNT * SMALL_PER_BIG;
+
+    const skyEl = document.getElementById('sky');
+    const statusEl = document.getElementById('status');
+
+    function createRng(seed) {
+      let value = seed >>> 0;
+      return function () {
+        value = (1664525 * value + 1013904223) >>> 0;
+        return value / 4294967296;
+      };
+    }
+
+    const rng = createRng(0x7cafe001);
+    const smallStarGroups = [];
+    const bigStarEls = [];
+
+    function clamp(v, min, max) {
+      return Math.min(max, Math.max(min, v));
+    }
+
+    function createCluster(cxPercent, cyPercent) {
+      const cluster = document.createElement('section');
+      cluster.className = 'cluster';
+      cluster.style.left = `${cxPercent}%`;
+      cluster.style.top = `${cyPercent}%`;
+
+      const big = document.createElement('div');
+      big.className = 'big-star';
+      cluster.appendChild(big);
+      bigStarEls.push(big);
+      const group = [];
+
+      const rawStars = [];
+      for (let i = 0; i < SMALL_PER_BIG; i++) {
+        const s = document.createElement('div');
+        s.className = 'small-star';
+
+        const angle = rng() * Math.PI * 2;
+        const radius = 6 + rng() * 14;
+        const jitter = (rng() - 0.5) * 3.5;
+        const sx = Math.cos(angle) * radius + jitter;
+        const sy = Math.sin(angle) * radius + jitter;
+
+        s.style.left = `${sx}vmin`;
+        s.style.top = `${sy}vmin`;
+        cluster.appendChild(s);
+        rawStars.push(s);
+      }
+
+      // Shuffle light-up order so stars don't turn on sequentially
+      const shuffled = [...rawStars];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      shuffled.forEach((s) => group.push(s));
+
+      smallStarGroups.push(group);
+
+      skyEl.appendChild(cluster);
+    }
+
+    function buildSky() {
+      const cols = 5;
+      const rows = 4;
+      let index = 0;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const baseX = ((c + 0.5) / cols) * 100;
+          // Left 1/3 (c=0,1): top 4/5 = 80%; Middle 1/3 (c=2): top 3/5 = 60%; Right 1/3 (c=3,4): top 4/5 = 80%
+          const yMax = (c === 2) ? 60 : 80;
+          const baseY = 6 + ((r + 0.5) / rows) * (yMax - 6);
+          const jitterX = (rng() - 0.5) * 16;
+          const jitterY = (rng() - 0.5) * 14;
+          const x = clamp(baseX + jitterX, 4, 96);
+          const y = clamp(baseY + jitterY, 4, yMax);
+          createCluster(x, y);
+          index++;
+          if (index >= BIG_STAR_COUNT) {
+            return;
+          }
+        }
+      }
+    }
+
+    function applyTeamsProgress(teams, mode) {
+      let totalCount = 0;
+      let totalTarget = 0;
+      let completedTables = 0;
+
+      for (let i = 0; i < BIG_STAR_COUNT; i++) {
+        const team = teams[i];
+        const starGroup = smallStarGroups[i] || [];
+        const bigStar = bigStarEls[i];
+
+        if (!team || !bigStar) {
+          starGroup.forEach((el) => el.classList.remove('on'));
+          if (bigStar) {
+            bigStar.classList.remove('on');
+          }
+          continue;
+        }
+
+        const count = Math.max(0, mode === 'scoring' ? (Number(team.scoreCount) || 0) : (Number(team.count) || 0));
+        const target = Math.max(0, Number(team.target) || 0);
+        totalCount += count;
+        totalTarget += target;
+
+        // One person lights one small star (capped to 20 per table).
+        const litSmall = Math.min(count, SMALL_PER_BIG);
+
+        for (let j = 0; j < starGroup.length; j++) {
+          starGroup[j].classList.toggle('on', j < litSmall);
+        }
+
+        const completed = target > 0 && count >= target;
+        bigStar.classList.toggle('on', completed);
+        if (completed) {
+          completedTables++;
+        }
+      }
+
+      if (totalTarget > 0) {
+        statusEl.textContent = `${totalCount} / ${totalTarget} 人 · 完成 ${completedTables} / ${teams.length} 桌`;
+      } else {
+        statusEl.textContent = `${totalCount} 人 · 完成 ${completedTables} / ${teams.length} 桌`;
+      }
+    }
+
+    async function fetchState() {
+      try {
+        const response = await fetch('/api/bootstrap');
+        const data = await response.json();
+        const teams = Array.isArray(data.teams) ? data.teams : [];
+
+        if (!teams.length) {
+          applyTeamsProgress([], data.mode);
+          return;
+        }
+
+        const sortedTeams = [...teams].sort((a, b) => {
+          const aNum = Number(String(a.id || '').replace(/[^0-9]/g, '')) || 0;
+          const bNum = Number(String(b.id || '').replace(/[^0-9]/g, '')) || 0;
+          return aNum - bNum;
+        });
+
+        applyTeamsProgress(sortedTeams, data.mode);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    buildSky();
+    applyTeamsProgress([], 'banquet');
+    fetchState();
+    setInterval(fetchState, 500);
+  </script>
+</body>
+</html>
