@@ -7,7 +7,6 @@
 
 #define SENSOR_PIN 1  // KY-010 光遮斷傳感器的輸出腳位
 #define LED_PIN 3   // WS2812 LED 的數據腳位
-#define BUZZER_PIN 2  // 被動式蜂鳴器的訊號腳位
 #define NUM_LEDS 24
 
 
@@ -28,7 +27,6 @@ unsigned long lastWifiRetryMs = 0; // 上次重試 WiFi 連線的時間
 unsigned long lastRemoteSyncMs = 0; // 上次遠端同步的時間
 unsigned long testLightEndMs = 0; // 測試燈結束的時間
 long lastTestLightSeq = 0; // 上次測試燈序列
-long lastTestBeepSeq = 0; // 上次蜂鳴測試序列
 bool pendingCountSync = false; // 是否有待同步的計數
 bool isScoringMode = false; // 是否處於計分模式
 bool hasModeSync = false; // 是否已同步模式
@@ -50,8 +48,6 @@ constexpr uint8_t ALERT_BREATH_MAX = 255; // 呼吸燈最大亮度
 constexpr uint8_t LIGHT_TEST_MODE_CLASSIC = 0;
 constexpr uint8_t LIGHT_TEST_MODE_SWITCH = 1;
 constexpr uint8_t LIGHT_TEST_MODE_FINAL = 2;
-constexpr uint8_t BUZZER_CHANNEL = 0; // ESP32 LEDC 聲音輸出通道
-constexpr uint8_t BUZZER_RESOLUTION = 8; // LEDC PWM 解析度
 
 unsigned long alertBreathStepMs = ALERT_BREATH_STEP_MS;
 uint8_t alertBreathMin = ALERT_BREATH_MIN;
@@ -60,19 +56,7 @@ uint8_t alertBreathMax = ALERT_BREATH_MAX;
 uint8_t activeTestLightMode = LIGHT_TEST_MODE_CLASSIC;
 uint8_t testLightColorIndex = 0;
 uint8_t testLightBrightness = 220;
-
-const uint16_t SCORE_MELODY_NOTES[] = {1319, 1568}; // 得分旋律頻率（Hz）
-const unsigned long SCORE_MELODY_DURATIONS_MS[] = {100, 150}; // 各音符持續時間（ms）
-const size_t SCORE_MELODY_LENGTH = sizeof(SCORE_MELODY_NOTES) / sizeof(SCORE_MELODY_NOTES[0]);
 constexpr unsigned long SCORE_RAINBOW_DURATION_MS = 500; // 彩虹特效總時長（與旋律一致）
-constexpr size_t MAX_MELODY_LENGTH = 16;
-
-bool scoreMelodyActive = false; // 得分旋律是否正在播放
-size_t scoreMelodyIndex = 0; // 目前播放到第幾個音符
-unsigned long scoreMelodyStepStartMs = 0; // 目前音符開始的時間
-uint16_t activeMelodyNotes[MAX_MELODY_LENGTH] = {1319, 1568};
-unsigned long activeMelodyDurationsMs[MAX_MELODY_LENGTH] = {100, 150};
-size_t activeMelodyLength = SCORE_MELODY_LENGTH;
 bool scoreRainbowActive = false; // 得分彩虹特效是否正在播放
 unsigned long scoreRainbowStartMs = 0; // 得分彩虹特效開始時間
 
@@ -259,7 +243,6 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       <button id="decrementButton" class="button" type="button">-1</button>
       <button id="resetButton" class="button" type="button">歸零</button>
     </div>
-    <button id="beepButton" class="button secondary" type="button">測試蜂鳴器</button>
   </main>
 
   <script>
@@ -315,20 +298,6 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       }
     }
 
-    async function triggerBeep() {
-      const button = document.getElementById('beepButton');
-      button.disabled = true;
-      try {
-        await fetch('/beep', { method: 'POST' });
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setTimeout(() => {
-          button.disabled = false;
-        }, 200);
-      }
-    }
-
     document.getElementById('startButton').addEventListener('click', confirmTargetAndEnter);
     document.getElementById('welcomeTargetInput').addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
@@ -338,7 +307,6 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     document.getElementById('incrementButton').addEventListener('click', () => postAction('/increment'));
     document.getElementById('decrementButton').addEventListener('click', () => postAction('/decrement'));
     document.getElementById('resetButton').addEventListener('click', () => postAction('/reset'));
-    document.getElementById('beepButton').addEventListener('click', triggerBeep);
 
     fetchState();
   </script>
@@ -625,15 +593,6 @@ void refreshTestLight();
 uint8_t parseLightTestMode(const String& body);
 void runScoreRainbowLap();
 void refreshScoreRainbow();
-void startScoreMelody();
-void startCustomMelody(uint16_t frequencyOne, unsigned long durationOne, uint16_t frequencyTwo, unsigned long durationTwo);
-void stopScoreMelody();
-void refreshScoreMelody();
-void initBuzzerPwm();
-void buzzerWriteTone(uint16_t frequency);
-void playCoinSound();
-void playStarSound();
-void playMetalCoinSound();
 void printWifiStatusDetail();
 void scanAndPrintTargetSsid();
 
@@ -771,7 +730,6 @@ void scoringMode_applyRemoteState(unsigned long newCount, int newTarget) {
   scoringMode_renderLedState();
 
   if (scoringIncrement) {
-    startScoreMelody();
     runScoreRainbowLap();
   }
 }
@@ -789,7 +747,6 @@ void scoringMode_applyCounterChange(unsigned long newValue) {
   scoringMode_renderLedState();
 
   if (newValue == previous + 1) {
-    startScoreMelody();
     runScoreRainbowLap();
   }
 
@@ -933,10 +890,6 @@ void countingMode_applyCounterChange(unsigned long newValue) {
     countingMode_renderLedState();
   }
 
-  if (newValue == previous + 1) {
-    startScoreMelody();
-  }
-
   sendHeartbeat(true, true);
 }
 
@@ -1046,7 +999,7 @@ void countingMode_refreshLoop() {
   countingMode_handleSensorInput(); // 讀取感測器
 }
 
-// 定期從伺服器拉取該框 state（mode、count、target、testLightSeq、testBeepSeq）
+// 定期從伺服器拉取該框 state（mode、count、target、testLightSeq）
 // forceNow=true 時略過節流，立即執行
 // 防跟回舊値：若本地待同步且遠端回傳較小的小吐，保留本地値
 void fetchRemoteState(bool forceNow = false) {
@@ -1084,17 +1037,12 @@ void fetchRemoteState(bool forceNow = false) {
   const long syncedCount = extractJsonLong(body, "count", static_cast<long>(counter));       // 從 JSON 提取 count
   const long syncedTarget = extractJsonLong(body, "target", static_cast<long>(targetCount)); // 從 JSON 提取 target
   const long syncedTestLightSeq = extractJsonLong(body, "testLightSeq", lastTestLightSeq);   // 從 JSON 提取試亮序號
-  const long syncedTestBeepSeq = extractJsonLong(body, "testBeepSeq", lastTestBeepSeq);       // 從 JSON 提取蜂鳴測試序號
   const uint8_t syncedTestLightMode = parseLightTestMode(body);
   const long syncedTestLightColorIndex = extractJsonLong(body, "testLightColorIndex", 0);
   const long syncedTestLightBrightness = extractJsonLong(body, "testLightBrightness", 220);
   const long syncedTestLightFinalMin = extractJsonLong(body, "testLightFinalMin", ALERT_BREATH_MIN);
   const long syncedTestLightFinalMax = extractJsonLong(body, "testLightFinalMax", ALERT_BREATH_MAX);
   const long syncedTestLightFinalPeriodMs = extractJsonLong(body, "testLightFinalPeriodMs", 9000);
-  const long syncedBeepFrequencyOne = extractJsonLong(body, "testBeepFrequencyOne", SCORE_MELODY_NOTES[0]);
-  const long syncedBeepDurationOne = extractJsonLong(body, "testBeepDurationOne", SCORE_MELODY_DURATIONS_MS[0]);
-  const long syncedBeepFrequencyTwo = extractJsonLong(body, "testBeepFrequencyTwo", SCORE_MELODY_NOTES[1]);
-  const long syncedBeepDurationTwo = extractJsonLong(body, "testBeepDurationTwo", SCORE_MELODY_DURATIONS_MS[1]);
 
   if (syncedTestLightSeq > lastTestLightSeq) {
     lastTestLightSeq = syncedTestLightSeq;  // 更新已處理序號
@@ -1119,28 +1067,6 @@ void fetchRemoteState(bool forceNow = false) {
     }
 
     triggerTestLight();  // 新序號代表管理端觸發燈光測試
-  }
-
-  if (syncedTestBeepSeq > lastTestBeepSeq) {
-    lastTestBeepSeq = syncedTestBeepSeq;  // 更新已處理序號
-    
-    // Extract sound mode from JSON
-    const long soundMode = extractJsonLong(body, "testBeepMode", 0);
-    
-    // Call corresponding sound function based on mode
-    switch (soundMode) {
-      case 0:
-        playCoinSound();      // 投幣音
-        break;
-      case 1:
-        playStarSound();      // 星光音
-        break;
-      case 2:
-        playMetalCoinSound(); // 鐵幣音
-        break;
-      default:
-        break;
-    }
   }
 
   if (syncedCount < 0) {
@@ -1234,117 +1160,6 @@ void refreshScoreRainbow() {
     leds[i] = CHSV(hue, 255, 180);
   }
   FastLED.show();
-}
-
-// 初始化蜂鳴器 PWM，兼容 ESP32 Arduino Core 2.x/3.x
-void initBuzzerPwm() {
-#if defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 3)
-  ledcAttach(BUZZER_PIN, 2000, BUZZER_RESOLUTION);
-#else
-  ledcSetup(BUZZER_CHANNEL, 2000, BUZZER_RESOLUTION);
-  ledcAttachPin(BUZZER_PIN, BUZZER_CHANNEL);
-#endif
-}
-
-// 依 Core 版本以正確參數型式輸出指定頻率
-void buzzerWriteTone(uint16_t frequency) {
-#if defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 3)
-  ledcWriteTone(BUZZER_PIN, frequency);
-#else
-  ledcWriteTone(BUZZER_CHANNEL, frequency);
-#endif
-}
-
-// 音效 1：投幣音 (988-100ms, 1319-400ms)
-void playCoinSound() {
-  buzzerWriteTone(988);
-  delay(100);
-  buzzerWriteTone(1319);
-  delay(400);
-  buzzerWriteTone(0);
-}
-
-// 音效 2：星光音 (1047-120ms, 1319-120ms, 1568-120ms, 2093-250ms)
-// 使用非阻塞旋律系統，避免 delay() 阻塞主循環導致 LEDC 時鐘異常
-void playStarSound() {
-  activeMelodyNotes[0] = 1047;
-  activeMelodyNotes[1] = 1319;
-  activeMelodyNotes[2] = 1568;
-  activeMelodyNotes[3] = 2093;
-  activeMelodyDurationsMs[0] = 120;
-  activeMelodyDurationsMs[1] = 120;
-  activeMelodyDurationsMs[2] = 120;
-  activeMelodyDurationsMs[3] = 250;
-  activeMelodyLength = 4;
-  scoreMelodyActive = true;
-  scoreMelodyIndex = 0;
-  scoreMelodyStepStartMs = millis();
-  buzzerWriteTone(activeMelodyNotes[0]);
-}
-
-// 音效 3：鐵幣音 (1319-100ms, 1568-150ms)
-void playMetalCoinSound() {
-  buzzerWriteTone(1319);
-  delay(100);
-  buzzerWriteTone(1568);
-  delay(150);
-  buzzerWriteTone(0);
-}
-
-// 從第一個音開始播放得分旋律；若前一段尚未播完就直接重播
-void startScoreMelody() {
-  activeMelodyLength = SCORE_MELODY_LENGTH;
-  for (size_t index = 0; index < SCORE_MELODY_LENGTH; index++) {
-    activeMelodyNotes[index] = SCORE_MELODY_NOTES[index];
-    activeMelodyDurationsMs[index] = SCORE_MELODY_DURATIONS_MS[index];
-  }
-
-  scoreMelodyActive = true;
-  scoreMelodyIndex = 0;
-  scoreMelodyStepStartMs = millis();
-  buzzerWriteTone(activeMelodyNotes[0]);
-}
-
-void startCustomMelody(uint16_t frequencyOne, unsigned long durationOne, uint16_t frequencyTwo, unsigned long durationTwo) {
-  activeMelodyLength = MAX_MELODY_LENGTH;
-  activeMelodyNotes[0] = frequencyOne;
-  activeMelodyDurationsMs[0] = durationOne;
-  activeMelodyNotes[1] = frequencyTwo;
-  activeMelodyDurationsMs[1] = durationTwo;
-
-  scoreMelodyActive = true;
-  scoreMelodyIndex = 0;
-  scoreMelodyStepStartMs = millis();
-  buzzerWriteTone(activeMelodyNotes[0]);
-}
-
-// 停止蜂鳴器輸出，並把旋律狀態重設回初始值
-void stopScoreMelody() {
-  buzzerWriteTone(0);
-  scoreMelodyActive = false;
-  scoreMelodyIndex = 0;
-  scoreMelodyStepStartMs = 0;
-}
-
-// 以非阻塞方式推進旋律，不用 delay 卡住主循環
-void refreshScoreMelody() {
-  if (!scoreMelodyActive) {
-    return;
-  }
-
-  const unsigned long now = millis();
-  if (now - scoreMelodyStepStartMs < activeMelodyDurationsMs[scoreMelodyIndex]) {
-    return;
-  }
-
-  scoreMelodyIndex++;
-  if (scoreMelodyIndex >= activeMelodyLength) {
-    stopScoreMelody();
-    return;
-  }
-
-  scoreMelodyStepStartMs = now;
-  buzzerWriteTone(activeMelodyNotes[scoreMelodyIndex]);
 }
 
 // 重新洗牌顏色順序並調整避免首色跟上次相同
@@ -1478,38 +1293,6 @@ void handleState() {
   server.send(200, "application/json", stateJson());
 }
 
-// HTTP 路由：手動測試蜂鳴器
-void handleBeep() {
-  stopScoreMelody();
-
-  uint16_t hz = 2200;
-  unsigned long durationMs = 400;
-
-  if (server.hasArg("hz")) {
-    const long value = server.arg("hz").toInt();
-    if (value >= 100 && value <= 8000) {
-      hz = static_cast<uint16_t>(value);
-    }
-  }
-
-  if (server.hasArg("ms")) {
-    const long value = server.arg("ms").toInt();
-    if (value >= 50 && value <= 3000) {
-      durationMs = static_cast<unsigned long>(value);
-    }
-  }
-
-  buzzerWriteTone(hz);
-  delay(durationMs);
-  buzzerWriteTone(0);
-
-  server.send(
-      200,
-      "application/json",
-      String("{\"ok\":true,\"hz\":") + String(hz) +
-          String(",\"ms\":") + String(durationMs) + String("}"));
-}
-
 // HTTP 路由： +1 操作
 void handleIncrement() {
   if (isScoringMode) {
@@ -1558,9 +1341,6 @@ void setup() {
   pendingCountSync = false;  // 開機先以遠端狀態為準，避免覆寫遠端計分
 
   pinMode(SENSOR_PIN, INPUT_PULLUP);  // 啟用內部上拉電阻
-  pinMode(BUZZER_PIN, OUTPUT);  // 啟用蜂鳴器訊號腳位
-  initBuzzerPwm();
-  stopScoreMelody();
   alertBreathMin = ALERT_BREATH_MIN;
   alertBreathMax = ALERT_BREATH_MAX;
   alertBreathStepMs = ALERT_BREATH_STEP_MS;
@@ -1598,8 +1378,6 @@ void setup() {
   server.on("/", handleRoot);
   server.on("/star_night", handleStarNight);
   server.on("/state", handleState);
-  server.on("/beep", HTTP_GET, handleBeep);
-  server.on("/beep", HTTP_POST, handleBeep);
   server.on("/increment", HTTP_POST, handleIncrement);
   server.on("/decrement", HTTP_POST, handleDecrement);
   server.on("/reset", HTTP_POST, handleReset);
@@ -1630,7 +1408,6 @@ void loop() {
   ensureWifiConnected();        // 斷線時自動重連
   fetchRemoteState(false);      // 間隔拉取遠端狀態
   sendHeartbeat(false, false);  // 間隔報平安（預設不帶 count）
-  refreshScoreMelody();         // 背景推進得分旋律
 
   if (isScoringMode) {
     scoringMode_refreshLoop();   // 計分模式每圈刷新

@@ -63,10 +63,6 @@ app.get('/test-J2E13412/brightness-test', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'brightness-test.html'));
 });
 
-app.get('/test-J2E13412/sound-frequency-test', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'sound-frequency-test.html'));
-});
-
 app.get(`/${ADMIN_PATH_SEGMENT}`, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
@@ -196,24 +192,6 @@ app.post('/api/teams/:teamId/test-light-config', (req, res) => {
   return res.json({ team: serializeTeam(team) });
 });
 
-app.post('/api/teams/:teamId/test-buzzer', (req, res) => {
-  const team = findTeam(req.params.teamId);
-  if (!team) {
-    return res.status(404).json({ error: 'Team not found' });
-  }
-
-  // Sound mode: 0 = coin, 1 = star, 2 = metal coin
-  const soundMode = Math.max(0, Math.min(2, Number(req.body.soundMode) || 0));
-  
-  console.log('[test-buzzer] Sound mode:', soundMode);
-  
-  team.testBeepSeq = normalizeNumber(team.testBeepSeq) + 1;
-  team.testBeepMode = soundMode;
-  team.updatedAt = Date.now();
-  publishState();
-  return res.json({ team: serializeTeam(team) });
-});
-
 app.get('/api/teams/:teamId/state', (req, res) => {
   const team = findTeam(req.params.teamId);
   if (!team) {
@@ -234,8 +212,6 @@ app.get('/api/teams/:teamId/state', (req, res) => {
     testLightFinalMin: clampFinalBrightnessMin(team.testLightFinalMin),
     testLightFinalMax: clampFinalBrightnessMax(team.testLightFinalMax, clampFinalBrightnessMin(team.testLightFinalMin)),
     testLightFinalPeriodMs: clampFinalPeriodMs(team.testLightFinalPeriodMs),
-    testBeepSeq: normalizeNumber(team.testBeepSeq),
-    testBeepMode: Math.max(0, Math.min(2, normalizeNumber(team.testBeepMode))),
     updatedAt: team.updatedAt
   });
 });
@@ -335,12 +311,6 @@ function createDefaultState() {
       testLightFinalMin: 10,
       testLightFinalMax: 255,
       testLightFinalPeriodMs: 9000,
-      testBeepSeq: 0,
-      testBeepMode: 0,
-      testBeepFrequencyOne: 1319,
-      testBeepDurationOne: 100,
-      testBeepFrequencyTwo: 1568,
-      testBeepDurationTwo: 150,
       deviceId: '',
       deviceLastSeenAt: 0,
       clientLastSeenAt: 0,
@@ -387,11 +357,6 @@ function normalizeState(input) {
     testLightFinalMin: clampFinalBrightnessMin(team.testLightFinalMin),
     testLightFinalMax: clampFinalBrightnessMax(team.testLightFinalMax, clampFinalBrightnessMin(team.testLightFinalMin)),
     testLightFinalPeriodMs: clampFinalPeriodMs(team.testLightFinalPeriodMs),
-    testBeepSeq: Math.max(0, normalizeNumber(team.testBeepSeq)),
-    testBeepFrequencyOne: clampFrequency(team.testBeepFrequencyOne),
-    testBeepDurationOne: clampDuration(team.testBeepDurationOne),
-    testBeepFrequencyTwo: clampFrequency(team.testBeepFrequencyTwo),
-    testBeepDurationTwo: clampDuration(team.testBeepDurationTwo),
     deviceId: typeof team.deviceId === 'string' ? team.deviceId : '',
     deviceLastSeenAt: normalizeNumber(team.deviceLastSeenAt),
     clientLastSeenAt: normalizeNumber(team.clientLastSeenAt),
@@ -417,12 +382,6 @@ function normalizeState(input) {
       testLightFinalMin: 10,
       testLightFinalMax: 255,
       testLightFinalPeriodMs: 9000,
-      testBeepSeq: 0,
-      testBeepMode: 0,
-      testBeepFrequencyOne: 1319,
-      testBeepDurationOne: 100,
-      testBeepFrequencyTwo: 1568,
-      testBeepDurationTwo: 150,
       deviceId: '',
       deviceLastSeenAt: 0,
       clientLastSeenAt: 0,
@@ -471,11 +430,6 @@ function serializeTeam(team) {
     testLightFinalMin: clampFinalBrightnessMin(team.testLightFinalMin),
     testLightFinalMax: clampFinalBrightnessMax(team.testLightFinalMax, clampFinalBrightnessMin(team.testLightFinalMin)),
     testLightFinalPeriodMs: clampFinalPeriodMs(team.testLightFinalPeriodMs),
-    testBeepSeq: normalizeNumber(team.testBeepSeq),
-    testBeepFrequencyOne: clampFrequency(team.testBeepFrequencyOne),
-    testBeepDurationOne: clampDuration(team.testBeepDurationOne),
-    testBeepFrequencyTwo: clampFrequency(team.testBeepFrequencyTwo),
-    testBeepDurationTwo: clampDuration(team.testBeepDurationTwo),
     deviceId: team.deviceId,
     deviceOnline,
     clientActive,
@@ -489,18 +443,6 @@ function serializeTeam(team) {
 function normalizeNumber(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function clampFrequency(value) {
-  const normalized = normalizeNumber(value);
-  // Allow 0 to represent silence in sequences
-  if (normalized === 0) return 0;
-  return Math.min(20000, Math.max(20, normalized || 1319));
-}
-
-function clampDuration(value) {
-  const normalized = normalizeNumber(value);
-  return Math.min(10000, Math.max(10, normalized || 100));
 }
 
 function normalizeLightTestMode(value) {
