@@ -17,12 +17,12 @@ CRGB leds[NUM_LEDS];
 const char* WIFI_SSID = "counter";
 const char* WIFI_PASSWORD = "88888888";
 const char* SERVER_BASE_URL = "http://192.168.66.101:3000";
-const char* TEAM_ID = "team-1";
-const char* DEVICE_ID = "esp32-table-1";
+const char* TEAM_ID = "team-2";
+const char* DEVICE_ID = "esp32-table-2";
 
 const char* MQTT_BROKER = "192.168.66.101";
 constexpr uint16_t MQTT_PORT = 1883;
-// Topic: counter/<deviceId>/heartbeat
+// Topic: counter/heartbeat，全部裝置共用
 
 WiFiClient mqttWifiClient;
 PubSubClient mqttClient(mqttWifiClient);
@@ -778,6 +778,7 @@ void scoringMode_applyRemoteState(unsigned long newCount, int newTarget) {
   const unsigned long previous = counter;
   counter = newCount;
   targetCount = newTarget < 0 ? 0 : newTarget;
+  const bool remoteCountChanged = newCount != previous;
   const bool scoringIncrement = newCount > previous;
 
   Serial.print("Scoring Mode - Remote sync -> Count: ");
@@ -791,6 +792,10 @@ void scoringMode_applyRemoteState(unsigned long newCount, int newTarget) {
   if (scoringIncrement) {
     startMelody();
     runScoreRainbowLap();
+  }
+
+  if (remoteCountChanged) {
+    sendHeartbeat(true, true);  // 遠端 count 變動也立即回傳
   }
 }
 
@@ -907,6 +912,7 @@ void countingMode_applyRemoteState(unsigned long newCount, int newTarget) {
   const unsigned long previous = counter;
   counter = newCount;
   targetCount = newTarget < 0 ? 0 : newTarget;
+  const bool remoteCountChanged = newCount != previous;
 
   // 只有「第一次刺穿目標」才觸發提示（previous != counter 防止重複醒）
   const bool banquetTargetReached = targetCount > 0 && counter == static_cast<unsigned long>(targetCount) && previous != counter;
@@ -925,6 +931,10 @@ void countingMode_applyRemoteState(unsigned long newCount, int newTarget) {
     }
     currentDisplayColor = (counter == 0) ? CRGB::Black : nextRandomColor();
     countingMode_renderLedState();
+  }
+
+  if (remoteCountChanged) {
+    sendHeartbeat(true, true);  // 遠端 count 變動也立即回傳
   }
 }
 
@@ -1192,8 +1202,8 @@ void sendHeartbeat(bool forceNow = false, bool includeCount = false) {
 
   // 同步發佈一份到 MQTT Broker
   if (mqttClient.connected()) {
-    const String topic = String("counter/") + DEVICE_ID + "/heartbeat";
-    mqttClient.publish(topic.c_str(), payload.c_str());
+    const char* topic = "counter/heartbeat";
+    mqttClient.publish(topic, payload.c_str());
   }
 }
 
