@@ -39,14 +39,14 @@
     }
 
     .big-star {
-      --size: clamp(28px, 3.2vw, 44px);
+      --size: clamp(70px, 8vw, 110px);
       position: absolute;
       left: 0;
       top: 0;
       width: var(--size);
       height: var(--size);
       transform: translate(-50%, -50%);
-      background: url('/big_star.png?v=2') center center / contain no-repeat;
+      background: url('/small_star.png?v=2') center center / contain no-repeat;
       opacity: 0;
       transition: opacity 0.28s ease, transform 0.28s ease;
     }
@@ -54,6 +54,21 @@
     .big-star.on {
       opacity: 1;
       transform: translate(-50%, -50%) scale(1.08);
+      animation: big-star-twinkle 1.6s ease-in-out infinite;
+    }
+
+    @keyframes big-star-twinkle {
+      0%, 100% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.08);
+        filter: drop-shadow(0 0 0.25rem rgba(255, 243, 179, 0.55));
+      }
+
+      50% {
+        opacity: 0.45;
+        transform: translate(-50%, -50%) scale(0.94);
+        filter: drop-shadow(0 0 0.8rem rgba(255, 243, 179, 0.9));
+      }
     }
 
     .small-star {

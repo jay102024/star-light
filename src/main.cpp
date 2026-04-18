@@ -74,8 +74,8 @@ struct {
   bool active = false;
   uint8_t noteIndex = 0;
   unsigned long noteStartMs = 0;
-  const uint16_t frequencies[8] = {1047, 0, 1319, 0, 1568, 0, 2093, 0};
-  const uint16_t durations[8] = {120, 156, 120, 156, 120, 156, 250, 325};
+  const uint16_t frequencies[3] = { 988, 0, 1319};//638
+  const uint16_t durations[3] = {100, 50, 400};
 } melodyState;
 
 const CRGB COLOR_PALETTE[] = {
@@ -635,7 +635,7 @@ void updateMelody() {
   if (elapsed >= melodyState.durations[melodyState.noteIndex]) {
     melodyState.noteIndex++;
     
-    if (melodyState.noteIndex >= 8) {
+    if (melodyState.noteIndex >= 3) {
       // 所有音符播放完畢
       melodyState.active = false;
       ledcWriteTone(channel, 0);
