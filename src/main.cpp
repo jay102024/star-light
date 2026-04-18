@@ -4,6 +4,7 @@
 #include <WebServer.h>
 #include <HTTPClient.h>
 #include <FastLED.h>
+#include <PubSubClient.h>
 
 #define SENSOR_PIN 1  // KY-010 光遮斷傳感器的輸出腳位
 #define BUZZER_PIN 2
@@ -18,6 +19,13 @@ const char* WIFI_PASSWORD = "88888888";
 const char* SERVER_BASE_URL = "http://192.168.66.101:3000";
 const char* TEAM_ID = "team-1";
 const char* DEVICE_ID = "esp32-table-1";
+
+const char* MQTT_BROKER = "192.168.66.101";
+constexpr uint16_t MQTT_PORT = 1883;
+// Topic: counter/<deviceId>/heartbeat
+
+WiFiClient mqttWifiClient;
+PubSubClient mqttClient(mqttWifiClient);
 
 WebServer server(80);
 volatile unsigned long counter = 0; //目前計數值
@@ -661,6 +669,13 @@ void ensureWifiConnected() {
   WiFi.reconnect();
 }
 
+// 確保 MQTT 保持連線；若斷線則嘗試重連
+void ensureMqttConnected() {
+  if (!mqttClient.connected() && WiFi.status() == WL_CONNECTED) {
+    mqttClient.connect(DEVICE_ID);
+  }
+}
+
 // 印出目前 Wi-Fi 狀態碼與可讀訊息，方便快速定位失敗原因
 void printWifiStatusDetail() {
   const wl_status_t status = WiFi.status();
@@ -1174,6 +1189,12 @@ void sendHeartbeat(bool forceNow = false, bool includeCount = false) {
     pendingCountSync = false;  // 伺服器已確認，清除待同步旗標
   }
   http.end();
+
+  // 同步發佈一份到 MQTT Broker
+  if (mqttClient.connected()) {
+    const String topic = String("counter/") + DEVICE_ID + "/heartbeat";
+    mqttClient.publish(topic.c_str(), payload.c_str());
+  }
 }
 
 // 把所有燈珠設為同一顏色並更新輸出
@@ -1441,6 +1462,8 @@ void setup() {
     Serial.println(SERVER_BASE_URL);
     Serial.print("Team ID: ");
     Serial.println(TEAM_ID);
+    mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
+    mqttClient.connect(DEVICE_ID);
     fetchRemoteState(true);      // 開機先同步遠端狀態
     sendHeartbeat(true, false);  // 再報平安（不主動上傳 count）
   } else {
@@ -1455,6 +1478,8 @@ void setup() {
 void loop() {
   server.handleClient();        // 處理本機網頁連線
   ensureWifiConnected();        // 斷線時自動重連
+  ensureMqttConnected();        // MQTT 斷線時自動重連
+  mqttClient.loop();            // 處理 MQTT 心跳 / 來料
   fetchRemoteState(false);      // 間隔拉取遠端狀態
   sendHeartbeat(false, false);  // 間隔報平安（預設不帶 count）
   updateMelody();               // 更新非阻塞 melody 播放進度

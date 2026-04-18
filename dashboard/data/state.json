@@ -5,7 +5,7 @@
       "id": "team-1",
       "name": "第 1 桌",
       "count": 0,
-      "scoreCount": 22,
+      "scoreCount": 1,
       "target": 10,
       "testLightSeq": 12,
       "testLightMode": "classic",
@@ -20,9 +20,9 @@
       "testBeepFrequencyTwo": 1319,
       "testBeepDurationTwo": 100,
       "deviceId": "esp32-table-1",
-      "deviceLastSeenAt": 1776470571198,
-      "clientLastSeenAt": 1776470524333,
-      "updatedAt": 1776470571198
+      "deviceLastSeenAt": 1776477812769,
+      "clientLastSeenAt": 1776477742097,
+      "updatedAt": 1776477812769
     },
     {
       "id": "team-2",
