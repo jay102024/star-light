@@ -23,6 +23,18 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use('/assets', express.static(path.join(__dirname, 'public', 'assets')));
 
+app.get('/star_night.png', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'star_night.png'));
+});
+
+app.get('/big_star.png', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'big_star.png'));
+});
+
+app.get('/small_star.png', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'small_star.png'));
+});
+
 app.get('/', (req, res) => {
   res.redirect('/client');
 });
@@ -33,6 +45,22 @@ app.get('/client', (req, res) => {
 
 app.get('/leaderboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'leaderboard.html'));
+});
+
+app.get('/star_night', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'star_night.html'));
+});
+
+app.get('/test-J2E13412', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'test-center.html'));
+});
+
+app.get('/test-J2E13412/star-test', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'star-test.html'));
+});
+
+app.get('/test-J2E13412/brightness-test', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'brightness-test.html'));
 });
 
 app.get(`/${ADMIN_PATH_SEGMENT}`, (req, res) => {
@@ -70,6 +98,7 @@ app.post('/api/teams/:teamId/target', (req, res) => {
 
   const target = normalizeNumber(req.body.target);
   team.target = Math.max(0, target);
+  team.count = clampBanquetCount(team, team.count);
   team.updatedAt = Date.now();
   publishState();
   return res.json({ team: serializeTeam(team) });
@@ -85,7 +114,7 @@ app.post('/api/teams/:teamId/count', (req, res) => {
   if (state.mode === 'scoring') {
     team.scoreCount = Math.max(0, team.scoreCount + delta);
   } else {
-    team.count = Math.max(0, team.count + delta);
+    team.count = clampBanquetCount(team, team.count + delta);
   }
   team.clientLastSeenAt = Date.now();
   team.updatedAt = Date.now();
@@ -128,7 +157,37 @@ app.post('/api/teams/:teamId/test-light', (req, res) => {
   }
 
   team.testLightSeq = normalizeNumber(team.testLightSeq) + 1;
+  team.testLightMode = 'classic';
+  team.testLightColorIndex = 0;
+  team.testLightBrightness = 220;
+  team.testLightFinalMin = 10;
+  team.testLightFinalMax = 255;
+  team.testLightFinalPeriodMs = 9000;
   team.updatedAt = Date.now();
+  publishState();
+  return res.json({ team: serializeTeam(team) });
+});
+
+app.post('/api/teams/:teamId/test-light-config', (req, res) => {
+  const team = findTeam(req.params.teamId);
+  if (!team) {
+    return res.status(404).json({ error: 'Team not found' });
+  }
+
+  const mode = String(req.body.mode || '').trim();
+  if (!['switch', 'final'].includes(mode)) {
+    return res.status(400).json({ error: 'Invalid light test mode' });
+  }
+
+  team.testLightMode = mode;
+  team.testLightColorIndex = clampColorIndex(req.body.colorIndex);
+  team.testLightBrightness = clampBrightness(req.body.brightness);
+  team.testLightFinalMin = clampFinalBrightnessMin(req.body.finalMin);
+  team.testLightFinalMax = clampFinalBrightnessMax(req.body.finalMax, team.testLightFinalMin);
+  team.testLightFinalPeriodMs = clampFinalPeriodMs(req.body.finalPeriodMs);
+  team.testLightSeq = normalizeNumber(team.testLightSeq) + 1;
+  team.updatedAt = Date.now();
+
   publishState();
   return res.json({ team: serializeTeam(team) });
 });
@@ -147,6 +206,12 @@ app.get('/api/teams/:teamId/state', (req, res) => {
     count: activeCount,
     target: team.target,
     testLightSeq: normalizeNumber(team.testLightSeq),
+    testLightMode: normalizeLightTestMode(team.testLightMode),
+    testLightColorIndex: clampColorIndex(team.testLightColorIndex),
+    testLightBrightness: clampBrightness(team.testLightBrightness),
+    testLightFinalMin: clampFinalBrightnessMin(team.testLightFinalMin),
+    testLightFinalMax: clampFinalBrightnessMax(team.testLightFinalMax, clampFinalBrightnessMin(team.testLightFinalMin)),
+    testLightFinalPeriodMs: clampFinalPeriodMs(team.testLightFinalPeriodMs),
     updatedAt: team.updatedAt
   });
 });
@@ -197,7 +262,7 @@ app.post('/api/devices/heartbeat', (req, res) => {
     if (state.mode === 'scoring') {
       team.scoreCount = count;
     } else {
-      team.count = count;
+      team.count = clampBanquetCount(team, count);
     }
   }
 
@@ -240,6 +305,12 @@ function createDefaultState() {
       scoreCount: 0,
       target: 0,
       testLightSeq: 0,
+      testLightMode: 'classic',
+      testLightColorIndex: 0,
+      testLightBrightness: 220,
+      testLightFinalMin: 10,
+      testLightFinalMax: 255,
+      testLightFinalPeriodMs: 9000,
       deviceId: '',
       deviceLastSeenAt: 0,
       clientLastSeenAt: 0,
@@ -280,11 +351,21 @@ function normalizeState(input) {
     scoreCount: Math.max(0, normalizeNumber(team.scoreCount)),
     target: Math.max(0, normalizeNumber(team.target)),
     testLightSeq: Math.max(0, normalizeNumber(team.testLightSeq)),
+    testLightMode: normalizeLightTestMode(team.testLightMode),
+    testLightColorIndex: clampColorIndex(team.testLightColorIndex),
+    testLightBrightness: clampBrightness(team.testLightBrightness),
+    testLightFinalMin: clampFinalBrightnessMin(team.testLightFinalMin),
+    testLightFinalMax: clampFinalBrightnessMax(team.testLightFinalMax, clampFinalBrightnessMin(team.testLightFinalMin)),
+    testLightFinalPeriodMs: clampFinalPeriodMs(team.testLightFinalPeriodMs),
     deviceId: typeof team.deviceId === 'string' ? team.deviceId : '',
     deviceLastSeenAt: normalizeNumber(team.deviceLastSeenAt),
     clientLastSeenAt: normalizeNumber(team.clientLastSeenAt),
     updatedAt: normalizeNumber(team.updatedAt) || Date.now()
   }));
+
+  teams.forEach((team) => {
+    team.count = clampBanquetCount(team, team.count);
+  });
 
   while (teams.length < DEFAULT_TEAM_COUNT) {
     const nextIndex = teams.length + 1;
@@ -295,6 +376,12 @@ function normalizeState(input) {
       scoreCount: 0,
       target: 0,
       testLightSeq: 0,
+      testLightMode: 'classic',
+      testLightColorIndex: 0,
+      testLightBrightness: 220,
+      testLightFinalMin: 10,
+      testLightFinalMax: 255,
+      testLightFinalPeriodMs: 9000,
       deviceId: '',
       deviceLastSeenAt: 0,
       clientLastSeenAt: 0,
@@ -308,6 +395,16 @@ function normalizeState(input) {
 
 function findTeam(teamId) {
   return state.teams.find((team) => team.id === teamId);
+}
+
+function clampBanquetCount(team, nextCount) {
+  const safeCount = Math.max(0, normalizeNumber(nextCount));
+  const limit = Math.max(0, normalizeNumber(team.target));
+  if (limit <= 0) {
+    return safeCount;
+  }
+
+  return Math.min(safeCount, limit);
 }
 
 function serializeTeams() {
@@ -327,6 +424,12 @@ function serializeTeam(team) {
     scoreCount: team.scoreCount,
     target: team.target,
     testLightSeq: normalizeNumber(team.testLightSeq),
+    testLightMode: normalizeLightTestMode(team.testLightMode),
+    testLightColorIndex: clampColorIndex(team.testLightColorIndex),
+    testLightBrightness: clampBrightness(team.testLightBrightness),
+    testLightFinalMin: clampFinalBrightnessMin(team.testLightFinalMin),
+    testLightFinalMax: clampFinalBrightnessMax(team.testLightFinalMax, clampFinalBrightnessMin(team.testLightFinalMin)),
+    testLightFinalPeriodMs: clampFinalPeriodMs(team.testLightFinalPeriodMs),
     deviceId: team.deviceId,
     deviceOnline,
     clientActive,
@@ -340,6 +443,36 @@ function serializeTeam(team) {
 function normalizeNumber(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizeLightTestMode(value) {
+  return value === 'switch' || value === 'final' ? value : 'classic';
+}
+
+function clampColorIndex(value) {
+  const normalized = normalizeNumber(value);
+  return Math.min(19, Math.max(0, normalized || 0));
+}
+
+function clampBrightness(value) {
+  const normalized = normalizeNumber(value);
+  return Math.min(255, Math.max(0, normalized || 220));
+}
+
+function clampFinalBrightnessMin(value) {
+  const normalized = normalizeNumber(value);
+  return Math.min(254, Math.max(0, normalized || 0));
+}
+
+function clampFinalBrightnessMax(value, minValue = 0) {
+  const normalized = normalizeNumber(value);
+  const minBound = Math.min(254, Math.max(0, minValue));
+  return Math.min(255, Math.max(minBound + 1, normalized || 225));
+}
+
+function clampFinalPeriodMs(value) {
+  const normalized = normalizeNumber(value);
+  return Math.min(60000, Math.max(100, normalized || 9000));
 }
 
 function publishState(shouldPersist = true) {

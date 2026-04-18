@@ -10,9 +10,13 @@ const incrementButton = document.getElementById('incrementButton');
 const decrementButton = document.getElementById('decrementButton');
 const changeTeamButton = document.getElementById('changeTeamButton');
 
+const scoringBlock = document.getElementById('scoringBlock');
+const clientMain = document.getElementById('clientMain');
+
 const TEAM_STORAGE_KEY = 'counter:selected-team';
 
 let teams = [];
+let mode = null;
 let selectedTeamId = localStorage.getItem(TEAM_STORAGE_KEY) || '';
 let presenceTimer = null;
 
@@ -22,6 +26,7 @@ async function bootstrap() {
   const response = await fetch('/api/bootstrap');
   const data = await response.json();
   teams = data.teams;
+  mode = data.mode;
   if (teams.some((team) => team.id === selectedTeamId)) {
     startPresencePing();
   } else {
@@ -33,6 +38,7 @@ async function bootstrap() {
   const socket = io();
   socket.on('state', (payload) => {
     teams = payload.teams;
+    mode = payload.mode;
     render();
   });
 }
@@ -48,6 +54,14 @@ changeTeamButton.addEventListener('click', () => {
 });
 
 function render() {
+  if (mode === 'scoring') {
+    scoringBlock.classList.remove('hidden');
+    clientMain.classList.add('hidden');
+    return;
+  }
+  scoringBlock.classList.add('hidden');
+  clientMain.classList.remove('hidden');
+
   teamPickerGrid.innerHTML = teams.map((team) => `
     <button class="team-card selectable" type="button" data-team-id="${team.id}">
       <div class="team-top">
@@ -57,7 +71,7 @@ function render() {
         <span class="pill ${team.deviceOnline ? 'online' : 'offline'}">${team.deviceOnline ? '設備在線' : '設備離線'}</span>
       </div>
       <div class="team-count">${team.count}/${team.target}</div>
-      <p class="team-note">${team.target > 0 ? `距離目標還差 ${team.remaining} 人` : '尚未設定目標人數'}</p>
+      <p class="team-note">${team.target > 0 ? `距離上限還差 ${team.remaining} 人` : '尚未設定人數上限'}</p>
     </button>
   `).join('');
 
@@ -86,12 +100,15 @@ function render() {
   targetValue.textContent = `/${activeTeam.target}`;
 
   if (activeTeam.target <= 0) {
-    teamStatus.textContent = '管理員尚未設定目標人數';
+    teamStatus.textContent = '管理員尚未設定人數上限';
   } else if (activeTeam.completed) {
-    teamStatus.textContent = `已達標，超過 ${Math.max(0, activeTeam.count - activeTeam.target)} 人`;
+    teamStatus.textContent = '已達人數上限';
   } else {
-    teamStatus.textContent = `距離目標還差 ${activeTeam.remaining} 人`;
+    teamStatus.textContent = `距離上限還差 ${activeTeam.remaining} 人`;
   }
+
+  incrementButton.disabled = activeTeam.target > 0 && activeTeam.count >= activeTeam.target;
+  decrementButton.disabled = activeTeam.count <= 0;
 }
 
 async function updateCount(delta) {

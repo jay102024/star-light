@@ -57,6 +57,11 @@ npm start
 - Client: http://localhost:3000/client
 - Admin: http://localhost:3000/admin-J2E13412
 
+若要讓手機、其他電腦或 ESP32 連入，請改用這台主機目前的區網位址：
+
+- Client: http://192.168.31.242:3000/client
+- Admin: http://192.168.31.242:3000/admin-J2E13412
+
 注意：admin 是隱藏路徑，建議不要公開。
 
 ### A-4. 停止網站
@@ -81,7 +86,7 @@ npm start
 
 - `WIFI_SSID`：要連的 Wi-Fi 名稱
 - `WIFI_PASSWORD`：Wi-Fi 密碼
-- `SERVER_BASE_URL`：中央網站位址（例如 `http://192.168.66.101:3000`）
+- `SERVER_BASE_URL`：中央網站位址（目前設定為 `http://192.168.31.242:3000`）
 - `TEAM_ID`：桌號（例如 `team-1`）
 - `DEVICE_ID`：設備名稱（例如 `esp32-table-1`）
 
@@ -100,7 +105,8 @@ npm start
 
 打開 admin 頁面：
 
-- http://localhost:3000/admin-J2E13412
+- 本機：http://localhost:3000/admin-J2E13412
+- 區網其他裝置：http://192.168.31.242:3000/admin-J2E13412
 
 如果成功，該桌會顯示設備在線，並且人數會同步更新。
 
@@ -155,6 +161,6 @@ npm start
 ## 一句話快速流程（活動當天）
 
 1. 先開網站：`cd dashboard` -> `npm install`（首次）-> `npm start`
-2. 打開 admin：`http://localhost:3000/admin-J2E13412`
+2. 打開 admin：本機用 `http://localhost:3000/admin-J2E13412`，其他裝置用 `http://192.168.31.242:3000/admin-J2E13412`
 3. 啟動各桌 ESP32，確認在線
 4. 各桌用 client 頁面操作計數

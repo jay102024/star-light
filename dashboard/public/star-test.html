@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>夜空測試</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body class="test-body">
+  <main class="test-shell">
+    <section class="test-hero compact">
+      <p class="site-title">115年度星燈營</p>
+      <p class="eyebrow">Night Sky Test</p>
+      <h1>夜空測試</h1>
+      <p class="hero-copy">這裡是夜空測試控制台。開始後會先將資料歸零，再每秒隨機替各桌增加 0 到 2 人，供夜空顯示頁觀察星點亮起效果。</p>
+    </section>
+
+    <section class="test-panel night-sky-panel">
+      <article class="night-sky-card">
+        <p class="eyebrow">Controls</p>
+        <h2>測試控制</h2>
+        <p class="night-sky-copy">建議先開啟夜空顯示頁，再開始測試。</p>
+        <div class="night-sky-actions">
+          <button id="nightSkyToggleButton" class="brand-button" type="button">開始夜空測試</button>
+          <button id="nightSkyResetButton" class="danger-button" type="button">全部歸零</button>
+          <a class="ghost-button" href="/star_night" target="_blank" rel="noreferrer">開啟夜空顯示頁</a>
+          <a class="ghost-button" href="/test-J2E13412">回到測試中心</a>
+        </div>
+      </article>
+
+      <article class="night-sky-card stats-card">
+        <p class="eyebrow">Live Snapshot</p>
+        <h2>目前狀態</h2>
+        <div class="night-sky-stats">
+          <div>
+            <span>模式</span>
+            <strong id="nightSkyModeValue">讀取中</strong>
+          </div>
+          <div>
+            <span>全場總數</span>
+            <strong id="nightSkyCountValue">0</strong>
+          </div>
+          <div>
+            <span>已達標桌次</span>
+            <strong id="nightSkyCompletedValue">0</strong>
+          </div>
+          <div>
+            <span>測試狀態</span>
+            <strong id="nightSkyStatusValue">待命中</strong>
+          </div>
+        </div>
+      </article>
+
+      <article class="night-sky-card help-card">
+        <p class="eyebrow">Notes</p>
+        <h2>測試說明</h2>
+        <p class="night-sky-copy">夜空測試會自動切到圓滿餐會模式，因為夜空顯示是根據各桌人數與目標來亮起星點與大星。</p>
+        <p class="night-sky-copy">如果你要停止自動灌資料，按一次「停止夜空測試」即可。停止後目前數字會保留，除非你手動按「全部歸零」。</p>
+      </article>
+    </section>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/assets/star-test.js"></script>
+</body>
+</html>

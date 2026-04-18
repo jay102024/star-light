@@ -89,13 +89,13 @@ function render(skipTeamGrid = false) {
   if (mode === 'scoring') {
     heroEyebrow.textContent = '計分模式';
     heroTitle.textContent = '各桌積分總覽';
-    heroCopy.textContent = '每枚硬幣投入增加 1 分。主畫面維持固定桌次位置，排行榜可另外查看。';
+    heroCopy.textContent = '';
     panelTitle.textContent = '固定桌次總覽';
     leaderboardButton.classList.remove('hidden');
   } else if (mode === 'banquet') {
     heroEyebrow.textContent = '圓滿餐會';
     heroTitle.textContent = '各桌連線與完成狀態';
-    heroCopy.textContent = '這個頁面只透過特殊網址進入。用來查看所有設備是否在線、各桌進度，並設定每桌目標人數。';
+    heroCopy.textContent = '';
     panelTitle.textContent = '桌次總覽';
     leaderboardButton.classList.add('hidden');
     hideLeaderboardOverlay();
@@ -123,10 +123,6 @@ function renderSummary() {
       <article class="summary-card">
         <span class="muted">設備在線</span>
         <strong>${onlineCount}</strong>
-      </article>
-      <article class="summary-card">
-        <span class="muted">目前有隊長操作</span>
-        <strong>${activeClientCount}</strong>
       </article>
       <article class="summary-card">
         <span class="muted">全場總積分</span>
@@ -294,13 +290,13 @@ function renderBanquetGrid() {
       </div>
       <div class="team-actions-row">
         <button class="ghost-button team-delta-button" type="button" data-team-delta-id="${team.id}" data-team-delta="-1">-1</button>
-        <button class="brand-button team-delta-button" type="button" data-team-delta-id="${team.id}" data-team-delta="1">+1</button>
+        <button class="brand-button team-delta-button" type="button" data-team-delta-id="${team.id}" data-team-delta="1" ${team.target > 0 && team.count >= team.target ? 'disabled' : ''}>+1</button>
         <button class="danger-button team-test-button" type="button" data-team-test-id="${team.id}">試亮</button>
         <button class="danger-button team-reset-button" type="button" data-team-reset-id="${team.id}">歸零</button>
       </div>
       <form class="target-form" data-team-id="${team.id}">
-        <input id="target-${team.id}" name="target" type="number" min="0" step="1" placeholder="目標人數" value="${escapeHtml(getDraftOrTeamTarget(team))}">
-        <button class="brand-button" type="submit">更新</button>
+        <input id="target-${team.id}" name="target" type="number" min="0" step="1" placeholder="人數上限" value="${escapeHtml(getDraftOrTeamTarget(team))}">
+        <button class="brand-button" type="submit">設定上限</button>
       </form>
     </article>
   `).join('');
@@ -388,6 +384,15 @@ function attachDeltaListeners() {
           body: JSON.stringify({ delta })
         });
         if (!response.ok) { throw new Error('Team count update failed'); }
+
+        if (mode !== 'scoring') {
+          const data = await response.json();
+          if (data.team) {
+            teams = teams.map((team) => (team.id === teamId ? data.team : team));
+            render();
+          }
+          return;
+        }
       } catch (error) {
         console.error(error);
         window.alert('加減分數失敗，請稍後再試。');

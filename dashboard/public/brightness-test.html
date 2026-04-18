@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>光亮度測試</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body class="test-body">
+  <main class="test-shell">
+    <section class="test-hero compact">
+      <p class="site-title">115年度星燈營</p>
+      <p class="eyebrow">Brightness Test</p>
+      <h1>光亮度測試</h1>
+      <p class="hero-copy">使用 backup/current-version 的燈光測試方式：切換色彩測試與最終呼吸測試，並可指定到一台在線機器。</p>
+    </section>
+
+    <section class="test-panel brightness-remote-panel">
+      <article class="brightness-device-panel">
+        <p class="eyebrow">Online Devices</p>
+        <h2>選擇在線機器</h2>
+        <div id="brightnessDeviceList" class="brightness-device-list"></div>
+      </article>
+
+      <article class="brightness-config-panel">
+        <div class="tab-bar">
+          <button id="tabSwitch" class="tab-btn active" type="button">切換測試</button>
+          <button id="tabFinal" class="tab-btn" type="button">最終測試</button>
+        </div>
+
+        <div id="switchPanel">
+          <div id="swatchGrid" class="swatch-grid"></div>
+          <label for="switchBrightness">亮度 (0-255)</label>
+          <input id="switchBrightness" type="number" min="0" max="255" step="1" value="80">
+          <button id="applySwitchButton" class="brand-button" type="button">套用切換測試</button>
+        </div>
+
+        <div id="finalPanel" class="hidden">
+          <label for="finalMin">最低亮度 (0-254)</label>
+          <input id="finalMin" type="number" min="0" max="254" step="1" value="10">
+
+          <label for="finalMax">最高亮度 (1-255)</label>
+          <input id="finalMax" type="number" min="1" max="255" step="1" value="225">
+
+          <label for="finalPeriod">呼吸週期 (秒)</label>
+          <input id="finalPeriod" type="number" min="0.1" max="60" step="0.1" value="9">
+
+          <button id="applyFinalButton" class="brand-button" type="button">套用最終測試</button>
+        </div>
+
+        <a class="ghost-button" href="/test-J2E13412">回到測試中心</a>
+      </article>
+    </section>
+
+    <p id="brightnessStatus" class="sound-status">待命中</p>
+  </main>
+
+  <script src="/assets/brightness-test.js"></script>
+</body>
+</html>

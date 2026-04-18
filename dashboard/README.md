@@ -46,6 +46,11 @@ npm start
 - Client：`http://localhost:3000/client`
 - Admin：`http://localhost:3000/admin-J2E13412`
 
+如果是手機、其他電腦或 ESP32 要連入，改用這台主機目前的區網位址：
+
+- Client：`http://192.168.31.242:3000/client`
+- Admin：`http://192.168.31.242:3000/admin-J2E13412`
+
 注意：`admin` 是隱藏路徑，請不要公開貼在群組。
 
 ---
@@ -91,6 +96,10 @@ npm start
 例如設成 `admin-safe-2026`，那 admin 網址就會變：
 
 `http://localhost:3000/admin-safe-2026`
+
+若是從同網路其他裝置連入，則改成：
+
+`http://192.168.31.242:3000/admin-safe-2026`
 
 ### Q3. 手機或其他電腦打不開
 

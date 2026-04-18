@@ -7,8 +7,13 @@
   <link rel="stylesheet" href="/assets/styles.css">
 </head>
 <body class="client-body">
-  <main class="shell client-shell">
+  <div id="scoringBlock" class="scoring-block hidden">
+    <p class="scoring-block-msg">還沒圓滿，請圓滿餐會再來</p>
+  </div>
+
+  <main id="clientMain" class="shell client-shell">
     <section class="hero hero-client">
+      <p class="site-title">115年度星燈營</p>
       <p class="eyebrow">Client Zone</p>
       <h1>先選自己的隊伍，再進入計數器</h1>
       <p class="hero-copy">各桌長只需要進到這個頁面，選到自己的桌次，就可以即時加減人數。</p>
@@ -47,6 +52,23 @@
       </div>
     </section>
   </main>
+
+  <style>
+    .scoring-block {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .scoring-block.hidden { display: none; }
+    .scoring-block-msg {
+      font-size: clamp(1.4rem, 4vw, 2.2rem);
+      font-weight: 700;
+      color: #5f6f73;
+      text-align: center;
+      padding: 32px;
+    }
+  </style>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="/assets/client.js"></script>
