@@ -24,11 +24,26 @@
       overflow: hidden;
     }
 
+    .blackout {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      opacity: 0;
+      transition: opacity 4.2s ease;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    body.finale .blackout {
+      opacity: 1;
+    }
+
     .sky {
       position: fixed;
       inset: 0;
       overflow: hidden;
       isolation: isolate;
+      z-index: 2;
     }
 
     .cluster {
@@ -36,39 +51,40 @@
       width: 0;
       height: 0;
       transform: translate(-50%, -50%);
+      transition: left 4.2s ease, top 4.2s ease;
+    }
+
+    .sky.orbiting .cluster {
+      transition: none;
     }
 
     .big-star {
-      --size: clamp(70px, 8vw, 110px);
       position: absolute;
       left: 0;
       top: 0;
-      width: var(--size);
-      height: var(--size);
+      width: auto;
+      height: auto;
       transform: translate(-50%, -50%);
-      background: url('/small_star.png?v=2') center center / contain no-repeat;
+      background: none;
+      border: 0;
       opacity: 0;
       transition: opacity 0.28s ease, transform 0.28s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 0;
+      color: #fff8cf;
+      font-weight: 700;
+      font-size: clamp(1.7rem, 3.8vw, 2.2rem);
+      white-space: nowrap;
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
     }
 
     .big-star.on {
       opacity: 1;
       transform: translate(-50%, -50%) scale(1.08);
-      animation: big-star-twinkle 1.6s ease-in-out infinite;
-    }
-
-    @keyframes big-star-twinkle {
-      0%, 100% {
-        opacity: 1;
-        transform: translate(-50%, -50%) scale(1.08);
-        filter: drop-shadow(0 0 0.25rem rgba(255, 243, 179, 0.55));
-      }
-
-      50% {
-        opacity: 0.45;
-        transform: translate(-50%, -50%) scale(0.94);
-        filter: drop-shadow(0 0 0.8rem rgba(255, 243, 179, 0.9));
-      }
+      filter: drop-shadow(0 0 0.45rem rgba(255, 243, 179, 0.75));
     }
 
     .small-star {
@@ -88,6 +104,12 @@
       opacity: 1;
     }
 
+    .sky.finale .small-star {
+      opacity: 0 !important;
+      filter: brightness(0.1);
+      transition: opacity 4.2s ease;
+    }
+
     .status {
       position: absolute;
       right: 12px;
@@ -100,20 +122,200 @@
       background: rgba(8, 14, 34, 0.64);
       border: 1px solid rgba(169, 196, 255, 0.22);
       backdrop-filter: blur(2px);
+      transition: opacity 1.2s ease;
+      z-index: 5;
+    }
+
+    .status.hidden {
+      opacity: 0;
+    }
+
+    .fusion-ball {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%) scale(0.3);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 7;
+      background: radial-gradient(circle at 35% 30%, #fffdf2 0%, #ffe18f 28%, #ffb347 62%, #ff8a00 100%);
+      box-shadow: 0 0 20px rgba(255, 210, 125, 0.95), 0 0 48px rgba(255, 145, 0, 0.72);
+      transition: opacity 0.3s ease, transform 0.32s ease;
+    }
+
+    .fusion-ball.show {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    .beam-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 8;
+    }
+
+    .beam {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 0;
+      height: 5px;
+      transform-origin: left center;
+      transform: rotate(var(--angle));
+      border-radius: 999px;
+      opacity: 0;
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0.98) 0%, color-mix(in srgb, var(--beam-color) 85%, #ffffff 15%) 18%, var(--beam-color) 60%, rgba(0, 0, 0, 0) 100%);
+      box-shadow: 0 0 14px color-mix(in srgb, var(--beam-color) 75%, #ffffff 25%), 0 0 24px color-mix(in srgb, var(--beam-color) 65%, #ffffff 35%);
+      animation: beam-shoot 1.4s cubic-bezier(0.18, 0.62, 0.24, 1) forwards;
+    }
+
+    @keyframes beam-shoot {
+      0% {
+        width: 0;
+        opacity: 0;
+      }
+
+      9% {
+        width: 10vmin;
+        opacity: 1;
+      }
+
+      100% {
+        width: 135vmax;
+        opacity: 0;
+      }
+    }
+
+    .sky.merged .big-star,
+    .sky.merged .small-star {
+      opacity: 0 !important;
+    }
+
+    .ending-video {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 9;
+      background: #000;
+      transition: opacity 1s ease;
+    }
+
+    .ending-video.show {
+      opacity: 1;
+    }
+
+    .startup-bubble {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(2px);
+    }
+
+    .startup-bubble.hidden {
+      display: none;
+    }
+
+    .startup-bubble-card {
+      min-width: min(88vw, 340px);
+      max-width: 92vw;
+      border: 1px solid rgba(255, 233, 172, 0.45);
+      border-radius: 16px;
+      padding: 18px 18px 14px;
+      background: linear-gradient(170deg, rgba(31, 21, 4, 0.96) 0%, rgba(18, 13, 6, 0.96) 100%);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+      text-align: center;
+    }
+
+    .startup-bubble-text {
+      margin: 0 0 14px;
+      font-size: clamp(1.2rem, 2.5vw, 1.55rem);
+      font-weight: 800;
+      color: #ffe5a8;
+      letter-spacing: 0.04em;
+    }
+
+    .startup-bubble-close {
+      border: 0;
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      color: #241400;
+      background: linear-gradient(135deg, #ffe39a 0%, #ffc25d 100%);
     }
   </style>
 </head>
 <body>
+  <div id="blackout" class="blackout"></div>
   <main id="sky" class="sky"></main>
   <div id="status" class="status">0 / 400 人</div>
+  <div id="fusionBall" class="fusion-ball"></div>
+  <div id="beamLayer" class="beam-layer"></div>
+  <video id="endingVideo" class="ending-video" src="/test.mp4" preload="auto" playsinline></video>
+  <div id="startupBubble" class="startup-bubble" role="dialog" aria-modal="true" aria-label="啟動提示">
+    <div class="startup-bubble-card">
+      <p class="startup-bubble-text">請把我按掉</p>
+      <button id="startupBubbleClose" class="startup-bubble-close" type="button">按掉</button>
+    </div>
+  </div>
 
   <script>
     const BIG_STAR_COUNT = 20;
     const SMALL_PER_BIG = 20;
     const TOTAL_SMALL = BIG_STAR_COUNT * SMALL_PER_BIG;
+    const TEAM_NAMES = [
+      '恭敬', '慈悲', '和睦', '真誠', '布施',
+      '持戒', '忍辱', '精進', '禪定', '般若',
+      '十一', '十二', '十三', '十四', '十五',
+      '十六', '十七', '十八', '十九', '二十'
+    ];
 
     const skyEl = document.getElementById('sky');
     const statusEl = document.getElementById('status');
+    const fusionBallEl = document.getElementById('fusionBall');
+    const beamLayerEl = document.getElementById('beamLayer');
+    const endingVideoEl = document.getElementById('endingVideo');
+    const startupBubbleEl = document.getElementById('startupBubble');
+    const startupBubbleCloseEl = document.getElementById('startupBubbleClose');
+    const clusterEls = [];
+
+    let finalSequenceStarted = false;
+    let orbitAnimationStarted = false;
+    let orbitStartTs = 0;
+    let orbitLastTs = 0;
+    let orbitRafId = 0;
+    let orbitAngleOffset = 0;
+    let pollTimer = 0;
+    let burstStarted = false;
+    let endingVideoStartRequested = false;
+    let userInteracted = false;
+    let pendingUnmute = false;
+    const baseAngles = Array.from({ length: BIG_STAR_COUNT }, (_, i) => (-Math.PI / 2) + (i * (Math.PI * 2 / BIG_STAR_COUNT)));
+    const FINALE_TRANSITION_MS = 4200;
+    const FINALE_HOLD_MS = 1000;
+    const ORBIT_BASE_SPEED_RAD_PER_SEC = 0.5;
+    const ORBIT_MAX_SPEED_RAD_PER_SEC = 6.2;
+    const ORBIT_SHRINK_PER_SEC = 50.0;
+    const BURST_COLORS = [
+      '#ff5f57', '#ff8f3f', '#ffbe3b', '#e9ef4f', '#9af56b',
+      '#4ff2a2', '#33e5d4', '#34c6ff', '#3f9cff', '#4f7dff',
+      '#6e63ff', '#914dff', '#b04bff', '#d24fe4', '#f45bbd',
+      '#ff6397', '#ff7d6e', '#ff9a5c', '#ffd15f', '#c4ff6a'
+    ];
 
     function createRng(seed) {
       let value = seed >>> 0;
@@ -127,18 +329,33 @@
     const smallStarGroups = [];
     const bigStarEls = [];
 
+    function unlockVideoAudio() {
+      userInteracted = true;
+      if (pendingUnmute && !endingVideoEl.paused) {
+        endingVideoEl.muted = false;
+        endingVideoEl.volume = 1;
+        pendingUnmute = false;
+      }
+    }
+
+    window.addEventListener('pointerdown', unlockVideoAudio, { passive: true });
+    window.addEventListener('touchstart', unlockVideoAudio, { passive: true });
+    window.addEventListener('keydown', unlockVideoAudio);
+
     function clamp(v, min, max) {
       return Math.min(max, Math.max(min, v));
     }
 
-    function createCluster(cxPercent, cyPercent) {
+    function createCluster(cxPercent, cyPercent, index) {
       const cluster = document.createElement('section');
       cluster.className = 'cluster';
       cluster.style.left = `${cxPercent}%`;
       cluster.style.top = `${cyPercent}%`;
+      clusterEls.push(cluster);
 
       const big = document.createElement('div');
       big.className = 'big-star';
+      big.textContent = TEAM_NAMES[index] || String(index + 1);
       cluster.appendChild(big);
       bigStarEls.push(big);
       const group = [];
@@ -173,6 +390,179 @@
       skyEl.appendChild(cluster);
     }
 
+    function computeFinalRadius() {
+      return Math.min(window.innerWidth, window.innerHeight) * 0.34;
+    }
+
+    function placeClustersOnCircle(radiusPx, angleOffset = 0) {
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+
+      for (let i = 0; i < BIG_STAR_COUNT; i++) {
+        const cluster = clusterEls[i];
+        if (!cluster) {
+          continue;
+        }
+
+        const angle = baseAngles[i] + angleOffset;
+        const x = cx + Math.cos(angle) * radiusPx;
+        const y = cy + Math.sin(angle) * radiusPx;
+        cluster.style.left = `${x}px`;
+        cluster.style.top = `${y}px`;
+      }
+    }
+
+    function createBeam(angle, color) {
+      const beam = document.createElement('div');
+      beam.className = 'beam';
+      beam.style.setProperty('--angle', `${angle}rad`);
+      beam.style.setProperty('--beam-color', color);
+      beamLayerEl.appendChild(beam);
+      beam.addEventListener('animationend', () => {
+        beam.remove();
+      }, { once: true });
+    }
+
+    function playEndingVideo() {
+      if (endingVideoStartRequested) {
+        return;
+      }
+      endingVideoStartRequested = true;
+      endingVideoEl.classList.add('show');
+      endingVideoEl.volume = 1;
+      endingVideoEl.muted = false;
+      endingVideoEl.currentTime = 0;
+      endingVideoEl.load();
+
+      const startWithCurrentAudioPolicy = () => {
+        const playPromise = endingVideoEl.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+          playPromise.catch((err) => {
+            if (err && err.name === 'NotAllowedError') {
+              endingVideoEl.muted = true;
+              pendingUnmute = true;
+              const mutedPlayPromise = endingVideoEl.play();
+              if (mutedPlayPromise && typeof mutedPlayPromise.catch === 'function') {
+                mutedPlayPromise.catch((mutedErr) => {
+                  console.warn('Ending video autoplay failed:', mutedErr);
+                });
+              }
+              return;
+            }
+            console.warn('Ending video autoplay failed:', err);
+          });
+        }
+      };
+
+      if (userInteracted) {
+        endingVideoEl.muted = false;
+      }
+      endingVideoEl.addEventListener('canplay', startWithCurrentAudioPolicy, { once: true });
+      startWithCurrentAudioPolicy();
+    }
+
+    endingVideoEl.addEventListener('ended', () => {
+      endingVideoEl.pause();
+    });
+
+    window.addEventListener('load', () => {
+      endingVideoEl.muted = false;
+      endingVideoEl.volume = 1;
+      endingVideoEl.load();
+    });
+
+    startupBubbleCloseEl.addEventListener('click', () => {
+      startupBubbleEl.classList.add('hidden');
+    });
+
+    function triggerBurstSequence() {
+      if (burstStarted) {
+        return;
+      }
+      burstStarted = true;
+
+      skyEl.classList.add('merged');
+      fusionBallEl.classList.add('show');
+
+      setTimeout(() => {
+        for (let i = 0; i < BIG_STAR_COUNT; i++) {
+          createBeam(baseAngles[i], BURST_COLORS[i % BURST_COLORS.length]);
+        }
+        fusionBallEl.classList.remove('show');
+      }, 260);
+
+      setTimeout(() => {
+        playEndingVideo();
+      }, 1650);
+    }
+
+    function startOrbitAnimation() {
+      if (orbitAnimationStarted) {
+        return;
+      }
+      orbitAnimationStarted = true;
+      skyEl.classList.add('orbiting');
+      orbitStartTs = 0;
+      orbitLastTs = 0;
+      orbitAngleOffset = 0;
+
+      const startRadius = computeFinalRadius();
+      const minRadius = 0;
+
+      const tick = (ts) => {
+        if (!orbitStartTs) {
+          orbitStartTs = ts;
+        }
+        if (!orbitLastTs) {
+          orbitLastTs = ts;
+        }
+
+        const elapsedSec = (ts - orbitStartTs) / 1000;
+        const deltaSec = (ts - orbitLastTs) / 1000;
+        orbitLastTs = ts;
+
+        const radius = Math.max(minRadius, startRadius - elapsedSec * ORBIT_SHRINK_PER_SEC);
+        const shrinkRatio = startRadius > 0 ? (1 - (radius / startRadius)) : 1;
+        const speedNow = ORBIT_BASE_SPEED_RAD_PER_SEC + ((ORBIT_MAX_SPEED_RAD_PER_SEC - ORBIT_BASE_SPEED_RAD_PER_SEC) * (shrinkRatio * shrinkRatio));
+        orbitAngleOffset += speedNow * deltaSec;
+
+        placeClustersOnCircle(radius, orbitAngleOffset);
+
+        if (radius <= 0.5) {
+          placeClustersOnCircle(0, orbitAngleOffset);
+          cancelAnimationFrame(orbitRafId);
+          orbitRafId = 0;
+          triggerBurstSequence();
+          return;
+        }
+
+        orbitRafId = requestAnimationFrame(tick);
+      };
+
+      orbitRafId = requestAnimationFrame(tick);
+    }
+
+    function startFinalSequence() {
+      if (finalSequenceStarted) {
+        return;
+      }
+
+      finalSequenceStarted = true;
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = 0;
+      }
+      document.body.classList.add('finale');
+      skyEl.classList.add('finale');
+      statusEl.classList.add('hidden');
+
+      placeClustersOnCircle(computeFinalRadius(), 0);
+
+      setTimeout(() => {
+        startOrbitAnimation();
+      }, FINALE_TRANSITION_MS + FINALE_HOLD_MS);
+    }
+
     function buildSky() {
       const cols = 5;
       const rows = 4;
@@ -187,7 +577,7 @@
           const jitterY = (rng() - 0.5) * 14;
           const x = clamp(baseX + jitterX, 4, 96);
           const y = clamp(baseY + jitterY, 4, yMax);
-          createCluster(x, y);
+          createCluster(x, y, index);
           index++;
           if (index >= BIG_STAR_COUNT) {
             return;
@@ -197,6 +587,10 @@
     }
 
     function applyTeamsProgress(teams, mode) {
+      if (finalSequenceStarted) {
+        return;
+      }
+
       let totalCount = 0;
       let totalTarget = 0;
       let completedTables = 0;
@@ -233,6 +627,10 @@
         }
       }
 
+      if (completedTables >= BIG_STAR_COUNT) {
+        startFinalSequence();
+      }
+
       if (totalTarget > 0) {
         statusEl.textContent = `${totalCount} / ${totalTarget} 人 · 完成 ${completedTables} / ${teams.length} 桌`;
       } else {
@@ -266,7 +664,7 @@
     buildSky();
     applyTeamsProgress([], 'banquet');
     fetchState();
-    setInterval(fetchState, 500);
+    pollTimer = setInterval(fetchState, 500);
   </script>
 </body>
 </html>

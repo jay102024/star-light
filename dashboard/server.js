@@ -35,6 +35,20 @@ app.get('/small_star.png', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'small_star.png'));
 });
 
+app.get('/favicon.ico', (req, res) => {
+  res.status(204).end();
+});
+
+app.get('/test.mp4', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'test.mp4'), {
+    acceptRanges: false,
+    cacheControl: false,
+    headers: {
+      'Cache-Control': 'no-store'
+    }
+  });
+});
+
 app.get('/', (req, res) => {
   res.redirect('/client');
 });
