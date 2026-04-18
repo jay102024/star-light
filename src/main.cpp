@@ -6,6 +6,7 @@
 #include <FastLED.h>
 
 #define SENSOR_PIN 1  // KY-010 光遮斷傳感器的輸出腳位
+#define BUZZER_PIN 2
 #define LED_PIN 3   // WS2812 LED 的數據腳位
 #define NUM_LEDS 24
 
@@ -56,9 +57,19 @@ uint8_t alertBreathMax = ALERT_BREATH_MAX;
 uint8_t activeTestLightMode = LIGHT_TEST_MODE_CLASSIC;
 uint8_t testLightColorIndex = 0;
 uint8_t testLightBrightness = 220;
-constexpr unsigned long SCORE_RAINBOW_DURATION_MS = 500; // 彩虹特效總時長（與旋律一致）
+constexpr unsigned long SCORE_RAINBOW_DURATION_MS = 1078; // 彩虹特效總時長（與旋律一致）
 bool scoreRainbowActive = false; // 得分彩虹特效是否正在播放
 unsigned long scoreRainbowStartMs = 0; // 得分彩虹特效開始時間
+const int channel = 0;
+
+// 非阻塞 Melody 狀態
+struct {
+  bool active = false;
+  uint8_t noteIndex = 0;
+  unsigned long noteStartMs = 0;
+  const uint16_t frequencies[8] = {1047, 0, 1319, 0, 1568, 0, 2093, 0};
+  const uint16_t durations[8] = {120, 156, 120, 156, 120, 156, 250, 325};
+} melodyState;
 
 const CRGB COLOR_PALETTE[] = {
   CRGB::Lavender,
@@ -595,6 +606,39 @@ void runScoreRainbowLap();
 void refreshScoreRainbow();
 void printWifiStatusDetail();
 void scanAndPrintTargetSsid();
+void startMelody();
+void updateMelody();
+
+// 啟動非阻塞 melody 播放
+void startMelody() {
+  melodyState.active = true;
+  melodyState.noteIndex = 0;
+  melodyState.noteStartMs = millis();
+  ledcWriteTone(channel, melodyState.frequencies[0]);
+}
+
+// 更新 melody 播放進度（需在 loop() 中持續調用）
+void updateMelody() {
+  if (!melodyState.active) return;
+  
+  unsigned long now = millis();
+  unsigned long elapsed = now - melodyState.noteStartMs;
+  
+  // 檢查當前音符是否該結束
+  if (elapsed >= melodyState.durations[melodyState.noteIndex]) {
+    melodyState.noteIndex++;
+    
+    if (melodyState.noteIndex >= 8) {
+      // 所有音符播放完畢
+      melodyState.active = false;
+      ledcWriteTone(channel, 0);
+      return;
+    }
+    
+    melodyState.noteStartMs = now;
+    ledcWriteTone(channel, melodyState.frequencies[melodyState.noteIndex]);
+  }
+}
 
 // 回傳目前 count / target 的 JSON 字串，供本機網頁輪詢 /state 使用
 String stateJson() {
@@ -730,6 +774,7 @@ void scoringMode_applyRemoteState(unsigned long newCount, int newTarget) {
   scoringMode_renderLedState();
 
   if (scoringIncrement) {
+    startMelody();
     runScoreRainbowLap();
   }
 }
@@ -747,6 +792,7 @@ void scoringMode_applyCounterChange(unsigned long newValue) {
   scoringMode_renderLedState();
 
   if (newValue == previous + 1) {
+    startMelody();
     runScoreRainbowLap();
   }
 
@@ -1340,6 +1386,9 @@ void setup() {
   showSolid(CRGB::Black);    // 開機先全部燈烅
   pendingCountSync = false;  // 開機先以遠端狀態為準，避免覆寫遠端計分
 
+  ledcSetup(channel, 1047, 8);
+  ledcAttachPin(BUZZER_PIN, channel);
+
   pinMode(SENSOR_PIN, INPUT_PULLUP);  // 啟用內部上拉電阻
   alertBreathMin = ALERT_BREATH_MIN;
   alertBreathMax = ALERT_BREATH_MAX;
@@ -1408,6 +1457,7 @@ void loop() {
   ensureWifiConnected();        // 斷線時自動重連
   fetchRemoteState(false);      // 間隔拉取遠端狀態
   sendHeartbeat(false, false);  // 間隔報平安（預設不帶 count）
+  updateMelody();               // 更新非阻塞 melody 播放進度
 
   if (isScoringMode) {
     scoringMode_refreshLoop();   // 計分模式每圈刷新
