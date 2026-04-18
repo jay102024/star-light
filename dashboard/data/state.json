@@ -15,9 +15,9 @@
       "testLightFinalMax": 225,
       "testLightFinalPeriodMs": 9000,
       "deviceId": "esp32-table-1",
-      "deviceLastSeenAt": 1776487855249,
+      "deviceLastSeenAt": 1776504523559,
       "clientLastSeenAt": 1776489655818,
-      "updatedAt": 1776489655818
+      "updatedAt": 1776504523559
     },
     {
       "id": "team-2",

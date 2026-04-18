@@ -1,4 +1,5 @@
-﻿#include <Arduino.h>
+﻿//to-do 掐斷圓滿餐會時的mqtt
+#include <Arduino.h>
 #include <WiFi.h>
 #include <esp_wifi.h>
 #include <WebServer.h>
