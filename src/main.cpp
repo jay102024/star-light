@@ -5,7 +5,7 @@
 #include <HTTPClient.h>
 #include <FastLED.h>
 #include <PubSubClient.h>
-#include <Preferences.h>
+#include "nvram.h"
 
 #define SENSOR_PIN 1  // KY-010 光遮斷傳感器的輸出腳位
 #define BUZZER_PIN 2
@@ -17,12 +17,7 @@ CRGB leds[NUM_LEDS];
 
 const char* WIFI_SSID = "counter";
 const char* WIFI_PASSWORD = "88888888";
-const char* SERVER_BASE_URL = "http://192.168.66.101:3000";
-
-// 身份資訊改為每台板子儲存在 NVS，避免每次燒錄前手改常數
-Preferences prefs;
-String teamId;
-String deviceId;
+const char* SERVER_BASE_URL = "http://192.168.66.100:3000";
 
 const char* MQTT_BROKER = "192.168.66.101";
 constexpr uint16_t MQTT_PORT = 1883;
@@ -620,7 +615,6 @@ void printWifiStatusDetail();
 void scanAndPrintTargetSsid();
 void startMelody();
 void updateMelody();
-void loadDeviceIdentity();
 
 // 啟動非阻塞 melody 播放
 void startMelody() {
@@ -651,37 +645,6 @@ void updateMelody() {
     melodyState.noteStartMs = now;
     ledcWriteTone(channel, melodyState.frequencies[melodyState.noteIndex]);
   }
-}
-
-// 載入每台板子的身份資料；首次開機用 MAC 自動生成並保存
-void loadDeviceIdentity() {
-  prefs.begin("identity", false);
-
-  teamId = prefs.getString("teamId", "");
-  deviceId = prefs.getString("deviceId", "");
-
-  const uint64_t mac = ESP.getEfuseMac();
-  const uint32_t macLow = static_cast<uint32_t>(mac & 0xFFFFFFFFULL);
-
-  if (deviceId.length() == 0) {
-    char suffix[9] = {0};
-    snprintf(suffix, sizeof(suffix), "%08lX", static_cast<unsigned long>(macLow));
-    deviceId = String("esp32-") + suffix;
-    prefs.putString("deviceId", deviceId);
-  }
-
-  if (teamId.length() == 0) {
-    const int teamNumber = static_cast<int>(macLow % 20UL) + 1;  // team-1..team-20
-    teamId = String("team-") + String(teamNumber);
-    prefs.putString("teamId", teamId);
-  }
-
-  prefs.end();
-
-  Serial.print("Loaded Team ID: ");
-  Serial.println(teamId);
-  Serial.print("Loaded Device ID: ");
-  Serial.println(deviceId);
 }
 
 // 回傳目前 count / target 的 JSON 字串，供本機網頁輪詢 /state 使用
@@ -1462,7 +1425,7 @@ void setup() {
   alertBreathStepMs = ALERT_BREATH_STEP_MS;
   Serial.begin(115200);
   delay(10);
-  loadDeviceIdentity();
+  initNvram();
   lastSensorState = digitalRead(SENSOR_PIN);  // 記錄開機時初始感測器狀態
 
   WiFi.mode(WIFI_STA);  // 站點模式
