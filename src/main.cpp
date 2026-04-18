@@ -5,6 +5,7 @@
 #include <HTTPClient.h>
 #include <FastLED.h>
 #include <PubSubClient.h>
+#include <Preferences.h>
 
 #define SENSOR_PIN 1  // KY-010 光遮斷傳感器的輸出腳位
 #define BUZZER_PIN 2
@@ -17,8 +18,11 @@ CRGB leds[NUM_LEDS];
 const char* WIFI_SSID = "counter";
 const char* WIFI_PASSWORD = "88888888";
 const char* SERVER_BASE_URL = "http://192.168.66.101:3000";
-const char* TEAM_ID = "team-2";
-const char* DEVICE_ID = "esp32-table-2";
+
+// 身份資訊改為每台板子儲存在 NVS，避免每次燒錄前手改常數
+Preferences prefs;
+String teamId;
+String deviceId;
 
 const char* MQTT_BROKER = "192.168.66.101";
 constexpr uint16_t MQTT_PORT = 1883;
@@ -616,6 +620,7 @@ void printWifiStatusDetail();
 void scanAndPrintTargetSsid();
 void startMelody();
 void updateMelody();
+void loadDeviceIdentity();
 
 // 啟動非阻塞 melody 播放
 void startMelody() {
@@ -648,6 +653,37 @@ void updateMelody() {
   }
 }
 
+// 載入每台板子的身份資料；首次開機用 MAC 自動生成並保存
+void loadDeviceIdentity() {
+  prefs.begin("identity", false);
+
+  teamId = prefs.getString("teamId", "");
+  deviceId = prefs.getString("deviceId", "");
+
+  const uint64_t mac = ESP.getEfuseMac();
+  const uint32_t macLow = static_cast<uint32_t>(mac & 0xFFFFFFFFULL);
+
+  if (deviceId.length() == 0) {
+    char suffix[9] = {0};
+    snprintf(suffix, sizeof(suffix), "%08lX", static_cast<unsigned long>(macLow));
+    deviceId = String("esp32-") + suffix;
+    prefs.putString("deviceId", deviceId);
+  }
+
+  if (teamId.length() == 0) {
+    const int teamNumber = static_cast<int>(macLow % 20UL) + 1;  // team-1..team-20
+    teamId = String("team-") + String(teamNumber);
+    prefs.putString("teamId", teamId);
+  }
+
+  prefs.end();
+
+  Serial.print("Loaded Team ID: ");
+  Serial.println(teamId);
+  Serial.print("Loaded Device ID: ");
+  Serial.println(deviceId);
+}
+
 // 回傳目前 count / target 的 JSON 字串，供本機網頁輪詢 /state 使用
 String stateJson() {
   return "{\"count\":" + String(counter) + ",\"target\":" + String(targetCount) + "}";
@@ -672,7 +708,7 @@ void ensureWifiConnected() {
 // 確保 MQTT 保持連線；若斷線則嘗試重連
 void ensureMqttConnected() {
   if (!mqttClient.connected() && WiFi.status() == WL_CONNECTED) {
-    mqttClient.connect(DEVICE_ID);
+    mqttClient.connect(deviceId.c_str());
   }
 }
 
@@ -1086,7 +1122,7 @@ void fetchRemoteState(bool forceNow = false) {
   lastRemoteSyncMs = now;  // 記錄本次同步時間
 
   HTTPClient http;
-  const String url = String(SERVER_BASE_URL) + "/api/teams/" + TEAM_ID + "/state";
+  const String url = String(SERVER_BASE_URL) + "/api/teams/" + teamId + "/state";
   http.begin(url);
   const int statusCode = http.GET();
   if (statusCode < 200 || statusCode >= 300) {
@@ -1183,8 +1219,8 @@ void sendHeartbeat(bool forceNow = false, bool includeCount = false) {
   const bool shouldIncludeCount = includeCount || pendingCountSync;  // 只要有待同步就帶 count
 
   String payload =
-      String("{\"teamId\":\"") + TEAM_ID +
-      "\",\"deviceId\":\"" + DEVICE_ID +
+      String("{\"teamId\":\"") + teamId +
+      "\",\"deviceId\":\"" + deviceId +
       "\"";
   if (shouldIncludeCount) {
     payload += String(",\"count\":") + String(counter);  // 有待同步才帶 count 欄位
@@ -1426,6 +1462,7 @@ void setup() {
   alertBreathStepMs = ALERT_BREATH_STEP_MS;
   Serial.begin(115200);
   delay(10);
+  loadDeviceIdentity();
   lastSensorState = digitalRead(SENSOR_PIN);  // 記錄開機時初始感測器狀態
 
   WiFi.mode(WIFI_STA);  // 站點模式
@@ -1471,9 +1508,9 @@ void setup() {
     Serial.print("Central host: ");
     Serial.println(SERVER_BASE_URL);
     Serial.print("Team ID: ");
-    Serial.println(TEAM_ID);
+    Serial.println(teamId);
     mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
-    mqttClient.connect(DEVICE_ID);
+    mqttClient.connect(deviceId.c_str());
     fetchRemoteState(true);      // 開機先同步遠端狀態
     sendHeartbeat(true, false);  // 再報平安（不主動上傳 count）
   } else {
