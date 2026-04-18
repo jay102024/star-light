@@ -5,7 +5,7 @@
       "id": "team-1",
       "name": "第 1 桌",
       "count": 0,
-      "scoreCount": 19,
+      "scoreCount": 5,
       "target": 10,
       "testLightSeq": 12,
       "testLightMode": "classic",
@@ -15,9 +15,9 @@
       "testLightFinalMax": 225,
       "testLightFinalPeriodMs": 9000,
       "deviceId": "esp32-table-1",
-      "deviceLastSeenAt": 1776504523559,
-      "clientLastSeenAt": 1776489655818,
-      "updatedAt": 1776504523559
+      "deviceLastSeenAt": 1776511505379,
+      "clientLastSeenAt": 1776511390121,
+      "updatedAt": 1776511505379
     },
     {
       "id": "team-2",

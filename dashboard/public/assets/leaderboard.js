@@ -23,6 +23,10 @@ async function bootstrap() {
 }
 
 function render() {
+  lbEyebrow.textContent = '計分模式';
+  lbTitle.textContent = '積分排行榜';
+  renderScoring();
+  /*
   if (mode === 'scoring') {
     lbEyebrow.textContent = '計分模式';
     lbTitle.textContent = '積分排行榜';
@@ -34,6 +38,7 @@ function render() {
   } else {
     lbContent.innerHTML = '<p class="lb-waiting">等待管理員設定活動模式…</p>';
   }
+  */
 }
 
 function renderScoring() {

@@ -1,5 +1,4 @@
-﻿//to-do 掐斷圓滿餐會時的mqtt
-#include <Arduino.h>
+﻿#include <Arduino.h>
 #include <WiFi.h>
 #include <esp_wifi.h>
 #include <WebServer.h>
@@ -1201,7 +1200,7 @@ void sendHeartbeat(bool forceNow = false, bool includeCount = false) {
   http.end();
 
   // 同步發佈一份到 MQTT Broker
-  if (mqttClient.connected()) {
+  if (mqttClient.connected() && isScoringMode) {
     const char* topic = "counter/heartbeat";
     mqttClient.publish(topic, payload.c_str());
   }
