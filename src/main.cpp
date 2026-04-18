@@ -17,7 +17,7 @@ CRGB leds[NUM_LEDS];
 
 const char* WIFI_SSID = "counter";
 const char* WIFI_PASSWORD = "88888888";
-const char* SERVER_BASE_URL = "http://192.168.66.100:3000";
+const char* SERVER_BASE_URL = "http://192.168.66.101:3000";
 
 const char* MQTT_BROKER = "192.168.66.101";
 constexpr uint16_t MQTT_PORT = 1883;
