@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Star Night</title>
   <style>
     :root {
@@ -14,28 +14,17 @@
       box-sizing: border-box;
     }
 
+    html, body {
+      width: 100%;
+      height: 100%;
+    }
+
     body {
       margin: 0;
       min-height: 100vh;
-      color: #e6f0ff;
-      background:
-        url('/star_night.png') center bottom / auto 125vh no-repeat,
-        linear-gradient(180deg, #060d1f 0%, #07112a 40%, #050a18 70%, #030608 100%);
       overflow: hidden;
-    }
-
-    .blackout {
-      position: fixed;
-      inset: 0;
       background: #000;
-      opacity: 0;
-      transition: opacity 4.2s ease;
-      z-index: 1;
-      pointer-events: none;
-    }
-
-    body.finale .blackout {
-      opacity: 1;
+      color: #e6f0ff;
     }
 
     .sky {
@@ -43,87 +32,53 @@
       inset: 0;
       overflow: hidden;
       isolation: isolate;
-      z-index: 2;
-    }
-
-    .cluster {
-      position: absolute;
-      width: 0;
-      height: 0;
-      transform: translate(-50%, -50%) scale(var(--orbit-scale, 1));
-      transition: left 4.2s ease, top 4.2s ease;
-    }
-
-    .sky.orbiting .cluster {
-      transition: none;
+      background: #000;
     }
 
     .big-star {
       position: absolute;
       left: 0;
       top: 0;
-      width: clamp(120px, 15.5vw, 176px);
-      height: clamp(120px, 15.5vw, 176px);
-      transform: translate(-50%, -50%);
+      width: clamp(96px, 12vw, 148px);
+      height: clamp(96px, 12vw, 148px);
+      transform: translate(-50%, -50%) scale(1);
+      transform-origin: center center;
       background: url('/big_star.png') center center / contain no-repeat;
-      border: 0;
       opacity: 0;
-      transition: opacity 0.28s ease, transform 0.28s ease;
       display: flex;
       align-items: center;
       justify-content: center;
       text-align: center;
       padding: 0 14%;
+      filter: drop-shadow(0 0 0.3rem rgba(255, 238, 168, 0.55)) drop-shadow(0 0 1rem rgba(255, 208, 93, 0.24));
+      will-change: left, top, transform, opacity;
+      pointer-events: none;
+    }
+
+    .big-star.show {
+      opacity: 1;
     }
 
     .big-star-label {
-      color: #fff8cf;
-      font-weight: 700;
-      font-size: clamp(1.05rem, 2.2vw, 1.35rem);
+      color: #fffdf3;
+      font-weight: 800;
+      font-size: clamp(1.08rem, 2.15vw, 1.42rem);
+      letter-spacing: 0.02em;
       white-space: nowrap;
-      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
-      opacity: 1;
-      transition: opacity 2s ease;
-    }
-
-    .sky.orbiting .big-star-label {
-      opacity: 0;
-    }
-
-    .big-star.on {
-      opacity: 1;
-      transform: translate(-50%, -50%) scale(1.08);
-      filter: drop-shadow(0 0 0.45rem rgba(255, 243, 179, 0.75));
-    }
-
-    .small-star {
-      --size: clamp(14px, 1.7vw, 22px);
-      position: absolute;
-      left: 0;
-      top: 0;
-      width: var(--size);
-      height: var(--size);
-      transform: translate(-50%, -50%);
-      background: url('/small_star.png') center center / contain no-repeat;
-      opacity: 0;
-      transition: opacity 0.22s ease;
-    }
-
-    .small-star.on {
-      opacity: 1;
-    }
-
-    .sky.finale .small-star {
-      opacity: 0 !important;
-      filter: brightness(0.1);
-      transition: opacity 4.2s ease;
+      text-shadow:
+        0 1px 0 rgba(72, 38, 0, 0.9),
+        0 0 6px rgba(59, 22, 0, 0.72),
+        0 2px 10px rgba(0, 0, 0, 0.7),
+        0 0 18px rgba(255, 252, 225, 0.32);
+      pointer-events: none;
+      user-select: none;
     }
 
     .status {
       position: absolute;
       right: 12px;
       bottom: 12px;
-      z-index: 5;
+      z-index: 10;
       font-size: clamp(0.85rem, 1.2vw, 0.95rem);
       color: rgba(230, 241, 255, 0.9);
       padding: 8px 12px;
@@ -131,94 +86,6 @@
       background: rgba(8, 14, 34, 0.64);
       border: 1px solid rgba(169, 196, 255, 0.22);
       backdrop-filter: blur(2px);
-      transition: opacity 1.2s ease;
-      z-index: 5;
-    }
-
-    .status.hidden {
-      opacity: 0;
-    }
-
-    .fusion-ball {
-      position: fixed;
-      left: 50%;
-      top: 50%;
-      width: 52px;
-      height: 52px;
-      border-radius: 50%;
-      transform: translate(-50%, -50%) scale(0.3);
-      opacity: 0;
-      pointer-events: none;
-      z-index: 7;
-      background: radial-gradient(circle at 35% 30%, #fffdf2 0%, #ffe18f 28%, #ffb347 62%, #ff8a00 100%);
-      box-shadow: 0 0 20px rgba(255, 210, 125, 0.95), 0 0 48px rgba(255, 145, 0, 0.72);
-      transition: opacity 0.3s ease, transform 0.32s ease;
-    }
-
-    .fusion-ball.show {
-      opacity: 1;
-      transform: translate(-50%, -50%) scale(1);
-    }
-
-    .beam-layer {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 8;
-    }
-
-    .beam {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      width: 0;
-      height: 5px;
-      transform-origin: left center;
-      transform: rotate(var(--angle));
-      border-radius: 999px;
-      opacity: 0;
-      background: linear-gradient(90deg, rgba(255, 255, 255, 0.98) 0%, color-mix(in srgb, var(--beam-color) 85%, #ffffff 15%) 18%, var(--beam-color) 60%, rgba(0, 0, 0, 0) 100%);
-      box-shadow: 0 0 14px color-mix(in srgb, var(--beam-color) 75%, #ffffff 25%), 0 0 24px color-mix(in srgb, var(--beam-color) 65%, #ffffff 35%);
-      animation: beam-shoot 1.4s cubic-bezier(0.18, 0.62, 0.24, 1) forwards;
-    }
-
-    @keyframes beam-shoot {
-      0% {
-        width: 0;
-        opacity: 0;
-      }
-
-      9% {
-        width: 10vmin;
-        opacity: 1;
-      }
-
-      100% {
-        width: 135vmax;
-        opacity: 0;
-      }
-    }
-
-    .sky.merged .big-star,
-    .sky.merged .small-star {
-      opacity: 0 !important;
-    }
-
-    .ending-video {
-      position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      opacity: 0;
-      pointer-events: none;
-      z-index: 9;
-      background: #000;
-      transition: opacity 1s ease;
-    }
-
-    .ending-video.show {
-      opacity: 1;
     }
 
     .startup-bubble {
@@ -266,15 +133,46 @@
       color: #241400;
       background: linear-gradient(135deg, #ffe39a 0%, #ffc25d 100%);
     }
+
+    .light-ray {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: clamp(8px, 1vw, 14px);
+      height: 120vmax;
+      transform-origin: center bottom;
+      border-radius: 999px 999px 0 0;
+      background: linear-gradient(180deg, var(--ray-core, rgba(255, 251, 223, 0.98)) 0%, var(--ray-mid, rgba(255, 214, 108, 0.72)) 38%, rgba(255, 173, 61, 0) 100%);
+      opacity: 0;
+      pointer-events: none;
+      filter: drop-shadow(0 0 1rem var(--ray-glow, rgba(255, 222, 149, 0.75)));
+      will-change: transform, opacity;
+    }
+
+    .ending-video {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.6s ease;
+      z-index: 50;
+    }
+
+    .ending-video.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
   </style>
 </head>
 <body>
-  <div id="blackout" class="blackout"></div>
   <main id="sky" class="sky"></main>
+  <video id="endingVideo" class="ending-video" playsinline preload="auto" src="/God_Can_You_Hear_Me.mp4"></video>
   <div id="status" class="status">0 / 400 人</div>
-  <div id="fusionBall" class="fusion-ball"></div>
-  <div id="beamLayer" class="beam-layer"></div>
-  <video id="endingVideo" class="ending-video" src="/God_Can_You_Hear_Me.mp4" preload="auto" playsinline></video>
+
   <div id="startupBubble" class="startup-bubble" role="dialog" aria-modal="true" aria-label="啟動提示">
     <div class="startup-bubble-card">
       <p class="startup-bubble-text">請把我按掉</p>
@@ -284,8 +182,6 @@
 
   <script>
     const BIG_STAR_COUNT = 20;
-    const SMALL_PER_BIG = 20;
-    const TOTAL_SMALL = BIG_STAR_COUNT * SMALL_PER_BIG;
     const TEAM_NAMES = [
       '恭敬', '慈悲', '和睦', '真誠', '布施',
       '持戒', '忍辱', '精進', '禪定', '智慧',
@@ -293,368 +189,602 @@
       '普賢', '信心', '感恩', '菩提', '中道'
     ];
 
+    const CENTER_HOLD_MIN_MS = 1000;
+    const SHOW_GAP_MS = 1000;
+    const ENTER_MOVE_MS = 850;
+    const POLL_MS = 500;
+    const ORBIT_CIRCLE_MORPH_MS = 5000;
+    const ORBIT_COLLAPSE_MS = 5000;
+    const LABEL_FADE_OUT_MS = 2000;
+    const BURST_MS = 1300;
+    const ENDING_VIDEO_SRC = '/God_Can_You_Hear_Me.mp4';
+
+    const ORBIT_BASE_SPEED = 0.42;
+    const ORBIT_RADIUS_SCALE = 0.48;
+    const ORBIT_Y_SCALE = 0.54;
+    const ORBIT_STAR_SCALE = 0.88;
+    const ORBIT_DEPTH_SCALE_RANGE = 0.18;
+    const ORBIT_DEPTH_OPACITY_RANGE = 0.2;
+    const SHOW_SCALE = 2.0;
+
+    // 調小追趕強度，速度變化更平緩
+    const PHASE_CATCHUP_GAIN = 2.6;
+    const PHASE_MAX_STEP = 1.1;
+
+    // 防止超車：最小角距
     const skyEl = document.getElementById('sky');
     const statusEl = document.getElementById('status');
-    const fusionBallEl = document.getElementById('fusionBall');
-    const beamLayerEl = document.getElementById('beamLayer');
     const endingVideoEl = document.getElementById('endingVideo');
     const startupBubbleEl = document.getElementById('startupBubble');
     const startupBubbleCloseEl = document.getElementById('startupBubbleClose');
-    const clusterEls = [];
 
-    let finalSequenceStarted = false;
-    let orbitAnimationStarted = false;
-    let orbitStartTs = 0;
-    let orbitLastTs = 0;
-    let orbitRafId = 0;
-    let orbitAngleOffset = 0;
+    const stars = [];
+    const pendingQueue = [];
+    const lightRays = [];
+
     let pollTimer = 0;
-    let burstStarted = false;
-    let endingVideoStartRequested = false;
-    let userInteracted = false;
-    let pendingUnmute = false;
-    const baseAngles = Array.from({ length: BIG_STAR_COUNT }, (_, i) => (-Math.PI / 2) + (i * (Math.PI * 2 / BIG_STAR_COUNT)));
-    const FINALE_TRANSITION_MS = 4200;
-    const FINALE_HOLD_MS = 1000;
-    const ORBIT_BASE_SPEED_RAD_PER_SEC = 0.5;
-    const ORBIT_MAX_SPEED_RAD_PER_SEC = 6.2;
-    const ORBIT_SHRINK_PER_SEC = 50.0;
-    const ORBIT_FINAL_SCALE = 0.5;
-    const BURST_COLORS = [
-      '#ff5f57', '#ff8f3f', '#ffbe3b', '#e9ef4f', '#9af56b',
-      '#4ff2a2', '#33e5d4', '#34c6ff', '#3f9cff', '#4f7dff',
-      '#6e63ff', '#914dff', '#b04bff', '#d24fe4', '#f45bbd',
-      '#ff6397', '#ff7d6e', '#ff9a5c', '#ffd15f', '#c4ff6a'
-    ];
+    let rafId = 0;
+    let lastFrameTs = 0;
 
-    function createRng(seed) {
-      let value = seed >>> 0;
-      return function () {
-        value = (1664525 * value + 1013904223) >>> 0;
-        return value / 4294967296;
-      };
+    let activeShowStar = null;
+    let activeShowMinEndAt = 0;
+    let nextShowAllowedAt = 0;
+
+    let globalOrbitAngle = 0;
+    let endingPhase = 'idle';
+    let endingStartedAt = 0;
+    let burstStartedAt = 0;
+
+    function normalizeAngle(angle) {
+      while (angle <= -Math.PI) angle += Math.PI * 2;
+      while (angle > Math.PI) angle -= Math.PI * 2;
+      return angle;
     }
-
-    const rng = createRng(0x7cafe001);
-    const smallStarGroups = [];
-    const bigStarEls = [];
-
-    function unlockVideoAudio() {
-      userInteracted = true;
-      if (pendingUnmute && !endingVideoEl.paused) {
-        endingVideoEl.muted = false;
-        endingVideoEl.volume = 1;
-        pendingUnmute = false;
-      }
-    }
-
-    window.addEventListener('pointerdown', unlockVideoAudio, { passive: true });
-    window.addEventListener('touchstart', unlockVideoAudio, { passive: true });
-    window.addEventListener('keydown', unlockVideoAudio);
 
     function clamp(v, min, max) {
       return Math.min(max, Math.max(min, v));
     }
 
-    function createCluster(cxPercent, cyPercent, index) {
-      const cluster = document.createElement('section');
-      cluster.className = 'cluster';
-      cluster.style.left = `${cxPercent}%`;
-      cluster.style.top = `${cyPercent}%`;
-      clusterEls.push(cluster);
-
-      const big = document.createElement('div');
-      big.className = 'big-star';
-      const bigLabel = document.createElement('span');
-      bigLabel.className = 'big-star-label';
-      bigLabel.textContent = TEAM_NAMES[index] || String(index + 1);
-      big.appendChild(bigLabel);
-      cluster.appendChild(big);
-      bigStarEls.push(big);
-      const group = [];
-
-      const rawStars = [];
-      for (let i = 0; i < SMALL_PER_BIG; i++) {
-        const s = document.createElement('div');
-        s.className = 'small-star';
-
-        const angle = rng() * Math.PI * 2;
-        const radius = 6 + rng() * 14;
-        const jitter = (rng() - 0.5) * 3.5;
-        const sx = Math.cos(angle) * radius + jitter;
-        const sy = Math.sin(angle) * radius + jitter;
-
-        s.style.left = `${sx}vmin`;
-        s.style.top = `${sy}vmin`;
-        cluster.appendChild(s);
-        rawStars.push(s);
-      }
-
-      // Shuffle light-up order so stars don't turn on sequentially
-      const shuffled = [...rawStars];
-      for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(rng() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-      }
-      shuffled.forEach((s) => group.push(s));
-
-      smallStarGroups.push(group);
-
-      skyEl.appendChild(cluster);
+    function easeOutCubic(t) {
+      return 1 - Math.pow(1 - t, 3);
     }
 
-    function computeFinalRadius() {
-      return Math.min(window.innerWidth, window.innerHeight) * 0.34;
+    function positiveClockwiseDiff(from, to) {
+      let diff = normalizeAngle(to - from);
+      if (diff < 0) diff += Math.PI * 2;
+      return diff;
     }
 
-    function placeClustersOnCircle(radiusPx, angleOffset = 0) {
-      const cx = window.innerWidth / 2;
-      const cy = window.innerHeight / 2;
+    function signedAngleDiff(from, to) {
+      return normalizeAngle(to - from);
+    }
+
+    function computeOrbitRadiusX() {
+      return Math.min(window.innerWidth, window.innerHeight) * ORBIT_RADIUS_SCALE;
+    }
+
+    function computeOrbitRadiusY() {
+      return computeOrbitRadiusX() * ORBIT_Y_SCALE;
+    }
+
+    function getOrbitVisual(angle, cx, cy, rx, ry) {
+      const x = cx + Math.cos(angle) * rx;
+      const y = cy + Math.sin(angle) * ry;
+      const depth = (Math.sin(angle) + 1) / 2;
+      const scale = ORBIT_STAR_SCALE + depth * ORBIT_DEPTH_SCALE_RANGE;
+      const opacity = 1 - (1 - depth) * ORBIT_DEPTH_OPACITY_RANGE;
+      const zIndex = String(10 + Math.round(depth * 20));
+
+      return { x, y, scale, opacity, zIndex };
+    }
+
+    function easeInOutCubic(t) {
+      if (t < 0.5) return 4 * t * t * t;
+      return 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+
+    function lerp(a, b, t) {
+      return a + (b - a) * t;
+    }
+
+    function ensureLightRays() {
+      if (lightRays.length) return;
+
+      const rayColors = [
+        ['rgba(255,255,255,0.98)', 'rgba(255,99,99,0.78)', 'rgba(255,99,99,0.88)'],
+        ['rgba(255,255,255,0.98)', 'rgba(255,157,72,0.78)', 'rgba(255,157,72,0.88)'],
+        ['rgba(255,255,255,0.98)', 'rgba(255,210,80,0.78)', 'rgba(255,210,80,0.88)'],
+        ['rgba(255,255,255,0.98)', 'rgba(176,255,92,0.78)', 'rgba(176,255,92,0.88)'],
+        ['rgba(255,255,255,0.98)', 'rgba(86,255,154,0.78)', 'rgba(86,255,154,0.88)'],
+        ['rgba(255,255,255,0.98)', 'rgba(78,236,255,0.78)', 'rgba(78,236,255,0.88)'],
+        ['rgba(255,255,255,0.98)', 'rgba(95,168,255,0.78)', 'rgba(95,168,255,0.88)'],
+        ['rgba(255,255,255,0.98)', 'rgba(141,116,255,0.78)', 'rgba(141,116,255,0.88)'],
+        ['rgba(255,255,255,0.98)', 'rgba(208,105,255,0.78)', 'rgba(208,105,255,0.88)'],
+        ['rgba(255,255,255,0.98)', 'rgba(255,108,206,0.78)', 'rgba(255,108,206,0.88)']
+      ];
 
       for (let i = 0; i < BIG_STAR_COUNT; i++) {
-        const cluster = clusterEls[i];
-        if (!cluster) {
-          continue;
-        }
-
-        const angle = baseAngles[i] + angleOffset;
-        const x = cx + Math.cos(angle) * radiusPx;
-        const y = cy + Math.sin(angle) * radiusPx;
-        cluster.style.left = `${x}px`;
-        cluster.style.top = `${y}px`;
+        const ray = document.createElement('div');
+        ray.className = 'light-ray';
+        const [core, mid, glow] = rayColors[i % rayColors.length];
+        ray.style.setProperty('--ray-core', core);
+        ray.style.setProperty('--ray-mid', mid);
+        ray.style.setProperty('--ray-glow', glow);
+        skyEl.appendChild(ray);
+        lightRays.push(ray);
       }
     }
 
-    function createBeam(angle, color) {
-      const beam = document.createElement('div');
-      beam.className = 'beam';
-      beam.style.setProperty('--angle', `${angle}rad`);
-      beam.style.setProperty('--beam-color', color);
-      beamLayerEl.appendChild(beam);
-      beam.addEventListener('animationend', () => {
-        beam.remove();
-      }, { once: true });
+    function resetLightRays() {
+      for (const ray of lightRays) {
+        ray.style.opacity = '0';
+      }
     }
 
-    function playEndingVideo() {
-      if (endingVideoStartRequested) {
-        return;
-      }
-      endingVideoStartRequested = true;
-      endingVideoEl.classList.add('show');
-      endingVideoEl.volume = 1;
-      endingVideoEl.muted = false;
-      endingVideoEl.currentTime = 0;
-      endingVideoEl.load();
+    function updateLightBurst(now, cx, cy) {
+      ensureLightRays();
+      const progress = clamp((now - burstStartedAt) / BURST_MS, 0, 1);
+      const eased = easeOutCubic(progress);
 
-      const startWithCurrentAudioPolicy = () => {
-        const playPromise = endingVideoEl.play();
-        if (playPromise && typeof playPromise.catch === 'function') {
-          playPromise.catch((err) => {
-            if (err && err.name === 'NotAllowedError') {
-              endingVideoEl.muted = true;
-              pendingUnmute = true;
-              const mutedPlayPromise = endingVideoEl.play();
-              if (mutedPlayPromise && typeof mutedPlayPromise.catch === 'function') {
-                mutedPlayPromise.catch((mutedErr) => {
-                  console.warn('Ending video autoplay failed:', mutedErr);
-                });
-              }
-              return;
-            }
-            console.warn('Ending video autoplay failed:', err);
-          });
-        }
-      };
+      for (let i = 0; i < lightRays.length; i++) {
+        const ray = lightRays[i];
+        const angle = (360 / BIG_STAR_COUNT) * i;
+        const widthScale = 0.45 + (1 - progress) * 0.95;
+        const lengthScale = 0.2 + eased * 2.6;
+        const opacity = clamp(1 - progress * 1.15, 0, 1);
 
-      if (userInteracted) {
-        endingVideoEl.muted = false;
+        ray.style.left = `${cx}px`;
+        ray.style.top = `${cy}px`;
+        ray.style.opacity = String(opacity);
+        ray.style.zIndex = '45';
+        ray.style.transform = `translate(-50%, -100%) rotate(${angle}deg) scale(${widthScale}, ${lengthScale})`;
       }
-      endingVideoEl.addEventListener('canplay', startWithCurrentAudioPolicy, { once: true });
-      startWithCurrentAudioPolicy();
+
+      if (progress >= 1) {
+        resetLightRays();
+      }
     }
 
-    endingVideoEl.addEventListener('ended', () => {
-      endingVideoEl.pause();
-    });
+    function startEndingVideo() {
+      if (endingPhase === 'video') return;
 
-    window.addEventListener('load', () => {
-      endingVideoEl.muted = false;
-      endingVideoEl.volume = 1;
-      endingVideoEl.load();
-    });
-
-    startupBubbleCloseEl.addEventListener('click', () => {
-      startupBubbleEl.classList.add('hidden');
-    });
-
-    function triggerBurstSequence() {
-      if (burstStarted) {
-        return;
-      }
-      burstStarted = true;
-
-      skyEl.classList.add('merged');
-      fusionBallEl.classList.add('show');
-
-      setTimeout(() => {
-        for (let i = 0; i < BIG_STAR_COUNT; i++) {
-          createBeam(baseAngles[i], BURST_COLORS[i % BURST_COLORS.length]);
-        }
-        fusionBallEl.classList.remove('show');
-      }, 260);
-
-      setTimeout(() => {
-        playEndingVideo();
-      }, 1650);
-    }
-
-    function startOrbitAnimation() {
-      if (orbitAnimationStarted) {
-        return;
-      }
-      orbitAnimationStarted = true;
-      skyEl.classList.add('orbiting');
-      orbitStartTs = 0;
-      orbitLastTs = 0;
-      orbitAngleOffset = 0;
-
-      const startRadius = computeFinalRadius();
-      const minRadius = 0;
-
-      const tick = (ts) => {
-        if (!orbitStartTs) {
-          orbitStartTs = ts;
-        }
-        if (!orbitLastTs) {
-          orbitLastTs = ts;
-        }
-
-        const elapsedSec = (ts - orbitStartTs) / 1000;
-        const deltaSec = (ts - orbitLastTs) / 1000;
-        orbitLastTs = ts;
-
-        const radius = Math.max(minRadius, startRadius - elapsedSec * ORBIT_SHRINK_PER_SEC);
-        const shrinkRatio = startRadius > 0 ? (1 - (radius / startRadius)) : 1;
-        const speedNow = ORBIT_BASE_SPEED_RAD_PER_SEC + ((ORBIT_MAX_SPEED_RAD_PER_SEC - ORBIT_BASE_SPEED_RAD_PER_SEC) * (shrinkRatio * shrinkRatio));
-        const scaleNow = 1 - ((1 - ORBIT_FINAL_SCALE) * shrinkRatio);
-        orbitAngleOffset += speedNow * deltaSec;
-
-        placeClustersOnCircle(radius, orbitAngleOffset);
-        clusterEls.forEach((cluster) => {
-          cluster.style.setProperty('--orbit-scale', String(scaleNow));
-        });
-
-        if (radius <= 0.5) {
-          placeClustersOnCircle(0, orbitAngleOffset);
-          clusterEls.forEach((cluster) => {
-            cluster.style.setProperty('--orbit-scale', String(ORBIT_FINAL_SCALE));
-          });
-          cancelAnimationFrame(orbitRafId);
-          orbitRafId = 0;
-          triggerBurstSequence();
-          return;
-        }
-
-        orbitRafId = requestAnimationFrame(tick);
-      };
-
-      orbitRafId = requestAnimationFrame(tick);
-    }
-
-    function startFinalSequence() {
-      if (finalSequenceStarted) {
-        return;
-      }
-
-      finalSequenceStarted = true;
+      endingPhase = 'video';
       if (pollTimer) {
         clearInterval(pollTimer);
         pollTimer = 0;
       }
-      document.body.classList.add('finale');
-      skyEl.classList.add('finale');
-      statusEl.classList.add('hidden');
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = 0;
+      }
+      endingVideoEl.src = ENDING_VIDEO_SRC;
+      endingVideoEl.classList.add('show');
 
-      placeClustersOnCircle(computeFinalRadius(), 0);
-
-      setTimeout(() => {
-        startOrbitAnimation();
-      }, FINALE_TRANSITION_MS + FINALE_HOLD_MS);
+      const playAttempt = endingVideoEl.play();
+      if (playAttempt && typeof playAttempt.catch === 'function') {
+        playAttempt.catch(() => {
+          endingVideoEl.muted = true;
+          endingVideoEl.play().catch(() => {});
+        });
+      }
     }
 
-    function buildSky() {
-      const cols = 5;
-      const rows = 4;
-      let index = 0;
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          const baseX = ((c + 0.5) / cols) * 100;
-          // Left 1/3 (c=0,1): top 4/5 = 80%; Middle 1/3 (c=2): top 3/5 = 60%; Right 1/3 (c=3,4): top 4/5 = 80%
-          const yMax = (c === 2) ? 60 : 80;
-          const baseY = 6 + ((r + 0.5) / rows) * (yMax - 6);
-          const jitterX = (rng() - 0.5) * 16;
-          const jitterY = (rng() - 0.5) * 14;
-          const x = clamp(baseX + jitterX, 4, 96);
-          const y = clamp(baseY + jitterY, 4, yMax);
-          createCluster(x, y, index);
-          index++;
-          if (index >= BIG_STAR_COUNT) {
-            return;
-          }
+    function maybeStartEndingSequence(now) {
+      if (endingPhase !== 'idle') return;
+      if (activeShowStar) return;
+      if (getOrbitingStars().length !== BIG_STAR_COUNT) return;
+
+      endingPhase = 'morph';
+      endingStartedAt = now;
+      burstStartedAt = 0;
+      statusEl.style.opacity = '0';
+    }
+
+    function createBigStar(index) {
+      const el = document.createElement('div');
+      el.className = 'big-star';
+
+      const label = document.createElement('span');
+      label.className = 'big-star-label';
+      label.textContent = TEAM_NAMES[index] || String(index + 1);
+
+      el.appendChild(label);
+      skyEl.appendChild(el);
+      return el;
+    }
+
+    function createStarState(index) {
+      const el = createBigStar(index);
+      return {
+        index,
+        name: TEAM_NAMES[index] || String(index + 1),
+        el,
+
+        completed: false,
+        queued: false,
+        showing: false,
+        entering: false,
+        orbiting: false,
+
+        phaseOffset: 0,
+        targetPhaseOffset: 0,
+
+        enterStartAt: 0,
+        showStartAt: 0,
+        memberCount: 0,
+        showFromX: 0,
+        showFromY: 0
+      };
+    }
+
+    function ensureStars() {
+      if (stars.length) return;
+      for (let i = 0; i < BIG_STAR_COUNT; i++) {
+        stars.push(createStarState(i));
+      }
+    }
+
+    function getOrbitingStars() {
+      return stars.filter(s => s.orbiting);
+    }
+
+    function enqueueStar(star) {
+      if (star.queued || star.showing || star.entering || star.orbiting) return;
+      star.queued = true;
+      pendingQueue.push(star);
+    }
+
+    function getTopAngle() {
+      return -Math.PI / 2;
+    }
+
+    function getTopPhaseOffset() {
+      return normalizeAngle(getTopAngle() - globalOrbitAngle);
+    }
+
+    function getFixedSlotPhaseOffset(index) {
+      const step = Math.PI * 2 / BIG_STAR_COUNT;
+      return normalizeAngle(getTopAngle() + index * step);
+    }
+
+    function getRandomEdgeEntryPoint() {
+      const margin = 140;
+      const edge = Math.floor(Math.random() * 4);
+
+      if (edge === 0) {
+        return { x: Math.random() * window.innerWidth, y: -margin };
+      }
+
+      if (edge === 1) {
+        return { x: window.innerWidth + margin, y: Math.random() * window.innerHeight };
+      }
+
+      if (edge === 2) {
+        return { x: Math.random() * window.innerWidth, y: window.innerHeight + margin };
+      }
+
+      return { x: -margin, y: Math.random() * window.innerHeight };
+    }
+
+    function startCenterShow(star, now) {
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      const entry = getRandomEdgeEntryPoint();
+
+      star.queued = false;
+      star.showing = true;
+      star.entering = false;
+      star.orbiting = false;
+      star.showStartAt = now;
+      star.showFromX = entry.x;
+      star.showFromY = entry.y;
+      star.targetPhaseOffset = getFixedSlotPhaseOffset(star.index);
+
+      star.el.classList.add('show');
+      star.el.style.left = `${entry.x}px`;
+      star.el.style.top = `${entry.y}px`;
+      star.el.style.transform = `translate(-50%, -50%) scale(${SHOW_SCALE * 0.55})`;
+      star.el.style.opacity = '0';
+      star.el.style.zIndex = '40';
+
+      activeShowStar = star;
+      activeShowMinEndAt = now + CENTER_HOLD_MIN_MS;
+    }
+
+    function canInsertFromTop(now) {
+      return activeShowStar && !activeShowStar.entering && now >= activeShowMinEndAt;
+    }
+
+    function sendStarToOrbit(star, now) {
+      star.showing = false;
+      star.entering = true;
+      star.orbiting = false;
+      star.enterStartAt = now;
+      star.targetPhaseOffset = getFixedSlotPhaseOffset(star.index);
+      star.el.classList.add('show');
+      star.el.style.opacity = '1';
+
+      // 先讓出空位，再滑入
+    }
+
+    function processQueue(now) {
+      if (activeShowStar) {
+        if (canInsertFromTop(now)) {
+          sendStarToOrbit(activeShowStar, now);
+        }
+        return;
+      }
+
+      if (now < nextShowAllowedAt) return;
+      if (pendingQueue.length === 0) return;
+
+      const nextStar = pendingQueue.shift();
+      if (!nextStar) return;
+      startCenterShow(nextStar, now);
+    }
+
+    function updateOrbitingStars(deltaSec, cx, cy, rx, ry) {
+      return updateOrbitingStarsFixed(deltaSec, cx, cy, rx, ry);
+
+      const orbiting = getOrbitingStars();
+      if (orbiting.length === 0) return;
+
+      // 依目前絕對角度排序
+      const ordered = orbiting.map(star => {
+        const angle = normalizeAngle(globalOrbitAngle + star.phaseOffset);
+        const targetAngle = normalizeAngle(globalOrbitAngle + star.targetPhaseOffset);
+        return { star, angle, targetAngle };
+      }).sort((a, b) => a.angle - b.angle);
+
+      const n = ordered.length;
+      const minGap = Math.min((Math.PI * 2 / Math.max(n, 1)) * 0.35, 0.32) + MIN_GAP_MARGIN;
+
+      // 先算各自想前進多少（只允許順時針）
+      const candidates = [];
+      for (let i = 0; i < n; i++) {
+        const item = ordered[i];
+        const diff = signedAngleDiff(item.angle, item.targetAngle);
+        const addSpeed = clamp(diff * PHASE_CATCHUP_GAIN, -PHASE_MAX_STEP, PHASE_MAX_STEP);
+        const candidate = item.angle + addSpeed * deltaSec;
+        candidates.push(candidate);
+      }
+
+      // 再做防超車限制：不能追過前車
+      const adjusted = [...candidates];
+      const unwrappedCurrent = ordered.map((item, i) => {
+        if (i === 0) return item.angle;
+        let a = item.angle;
+        while (a < ordered[i - 1].angle) a += Math.PI * 2;
+        return a;
+      });
+
+      const unwrappedCandidate = adjusted.map((cand, i) => {
+        let a = cand;
+        while (i > 0 && a < unwrappedCurrent[i]) a += Math.PI * 2;
+        return a;
+      });
+
+      for (let i = n - 1; i >= 0; i--) {
+        const nextIndex = (i + 1) % n;
+        let nextAngle;
+
+        if (i === n - 1) {
+          nextAngle = unwrappedCandidate[0] + Math.PI * 2;
+        } else {
+          nextAngle = unwrappedCandidate[i + 1];
+        }
+
+        const maxAllowed = nextAngle - minGap;
+        unwrappedCandidate[i] = Math.min(unwrappedCandidate[i], maxAllowed);
+
+        if (unwrappedCandidate[i] < unwrappedCurrent[i]) {
+          unwrappedCandidate[i] = unwrappedCurrent[i];
         }
       }
+
+      for (let i = 0; i < n; i++) {
+        const item = ordered[i];
+        const newAngle = normalizeAngle(unwrappedCandidate[i]);
+        item.star.phaseOffset = normalizeAngle(newAngle - globalOrbitAngle);
+
+        const visual = getOrbitVisual(newAngle, cx, cy, rx, ry);
+
+        item.star.el.style.left = `${visual.x}px`;
+        item.star.el.style.top = `${visual.y}px`;
+        item.star.el.style.transform = `translate(-50%, -50%) scale(${visual.scale})`;
+        item.star.el.style.opacity = String(visual.opacity);
+        item.star.el.style.zIndex = visual.zIndex;
+      }
+    }
+
+    function updateOrbitingStarsFixed(deltaSec, cx, cy, rx, ry, labelOpacity = 1, starsVisible = true) {
+      const orbiting = getOrbitingStars();
+      if (orbiting.length === 0) return;
+
+      for (const star of orbiting) {
+        star.targetPhaseOffset = getFixedSlotPhaseOffset(star.index);
+        const angle = normalizeAngle(globalOrbitAngle + star.phaseOffset);
+        const targetAngle = normalizeAngle(globalOrbitAngle + star.targetPhaseOffset);
+        const diff = signedAngleDiff(angle, targetAngle);
+        const addSpeed = clamp(diff * PHASE_CATCHUP_GAIN, -PHASE_MAX_STEP, PHASE_MAX_STEP);
+        const newAngle = normalizeAngle(angle + addSpeed * deltaSec);
+        star.phaseOffset = normalizeAngle(newAngle - globalOrbitAngle);
+
+        const visual = getOrbitVisual(newAngle, cx, cy, rx, ry);
+        star.el.style.left = `${visual.x}px`;
+        star.el.style.top = `${visual.y}px`;
+        star.el.style.transform = `translate(-50%, -50%) scale(${visual.scale})`;
+        star.el.style.opacity = starsVisible ? String(visual.opacity) : '0';
+        star.el.style.zIndex = visual.zIndex;
+        star.el.querySelector('.big-star-label').style.opacity = String(labelOpacity);
+      }
+    }
+
+    function updateEnteringStar(star, now, cx, cy, rx, ry) {
+      const progress = Math.min(1, (now - star.enterStartAt) / ENTER_MOVE_MS);
+      const radiusT = easeOutCubic(progress);
+      const targetAngle = normalizeAngle(globalOrbitAngle + star.targetPhaseOffset);
+      const targetVisual = getOrbitVisual(targetAngle, cx, cy, rx, ry);
+      const x = cx + (targetVisual.x - cx) * radiusT;
+      const y = cy + (targetVisual.y - cy) * radiusT;
+      const scale = SHOW_SCALE + (targetVisual.scale - SHOW_SCALE) * radiusT;
+      const opacity = 1 + (targetVisual.opacity - 1) * radiusT;
+
+      star.el.style.left = `${x}px`;
+      star.el.style.top = `${y}px`;
+      star.el.style.transform = `translate(-50%, -50%) scale(${scale})`;
+      star.el.style.opacity = String(opacity);
+      star.el.style.zIndex = targetVisual.zIndex;
+
+      if (progress >= 1) {
+        star.entering = false;
+        star.orbiting = true;
+        star.phaseOffset = star.targetPhaseOffset;
+
+        activeShowStar = null;
+        nextShowAllowedAt = now + SHOW_GAP_MS;
+      }
+    }
+
+    function getEndingOrbitState(now, baseRx, baseRy) {
+      if (endingPhase === 'idle') {
+        return { rx: baseRx, ry: baseRy, labelOpacity: 1, starsVisible: true };
+      }
+
+      const elapsed = now - endingStartedAt;
+
+      if (endingPhase === 'morph') {
+        const progress = clamp(elapsed / ORBIT_CIRCLE_MORPH_MS, 0, 1);
+        const eased = easeInOutCubic(progress);
+        const circleRadius = lerp(baseRy, baseRx, eased);
+
+        if (progress >= 1) {
+          endingPhase = 'collapse';
+          endingStartedAt = now;
+        }
+
+        return { rx: baseRx, ry: circleRadius, labelOpacity: 1, starsVisible: true };
+      }
+
+      if (endingPhase === 'collapse') {
+        const progress = clamp(elapsed / ORBIT_COLLAPSE_MS, 0, 1);
+        const eased = easeInOutCubic(progress);
+        const radius = lerp(baseRx, 0, eased);
+        const labelOpacity = clamp(1 - elapsed / LABEL_FADE_OUT_MS, 0, 1);
+
+        if (progress >= 1) {
+          endingPhase = 'burst';
+          burstStartedAt = now;
+        }
+
+        return { rx: radius, ry: radius, labelOpacity, starsVisible: true };
+      }
+
+      if (endingPhase === 'burst') {
+        return { rx: 0, ry: 0, labelOpacity: 0, starsVisible: false };
+      }
+
+      return { rx: 0, ry: 0, labelOpacity: 0, starsVisible: false };
+    }
+
+    function animate(ts) {
+      if (!lastFrameTs) lastFrameTs = ts;
+      const deltaSec = Math.min(0.05, (ts - lastFrameTs) / 1000);
+      lastFrameTs = ts;
+
+      globalOrbitAngle = normalizeAngle(globalOrbitAngle + ORBIT_BASE_SPEED * deltaSec);
+      maybeStartEndingSequence(ts);
+
+      processQueue(ts);
+
+      const baseRx = computeOrbitRadiusX();
+      const baseRy = computeOrbitRadiusY();
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      const endingOrbit = getEndingOrbitState(ts, baseRx, baseRy);
+
+      updateOrbitingStarsFixed(
+        deltaSec,
+        cx,
+        cy,
+        endingOrbit.rx,
+        endingOrbit.ry,
+        endingOrbit.labelOpacity,
+        endingOrbit.starsVisible
+      );
+
+      if (activeShowStar && activeShowStar.entering) {
+        updateEnteringStar(activeShowStar, ts, cx, cy, baseRx, baseRy);
+      }
+
+      if (activeShowStar && activeShowStar.showing) {
+        const progress = clamp((ts - activeShowStar.showStartAt) / CENTER_HOLD_MIN_MS, 0, 1);
+        const eased = easeInOutCubic(progress);
+
+        const x = activeShowStar.showFromX + (cx - activeShowStar.showFromX) * eased;
+        const y = activeShowStar.showFromY + (cy - activeShowStar.showFromY) * eased;
+
+        activeShowStar.el.style.left = `${x}px`;
+        activeShowStar.el.style.top = `${y}px`;
+        activeShowStar.el.style.transform = `translate(-50%, -50%) scale(${SHOW_SCALE * (0.55 + eased * 0.45)})`;
+        activeShowStar.el.style.opacity = String(0.12 + eased * 0.88);
+        activeShowStar.el.style.zIndex = '40';
+      }
+
+      if (endingPhase === 'burst') {
+        updateLightBurst(ts, cx, cy);
+
+        if (ts - burstStartedAt >= BURST_MS) {
+          startEndingVideo();
+        }
+      }
+
+      rafId = requestAnimationFrame(animate);
+    }
+
+    function ensureAnimation() {
+      if (rafId) return;
+      rafId = requestAnimationFrame(animate);
     }
 
     function applyTeamsProgress(teams, mode) {
-      if (finalSequenceStarted) {
-        return;
-      }
+      ensureStars();
 
       let totalCount = 0;
       let totalTarget = 0;
       let completedTables = 0;
+      const teamCount = teams.length || BIG_STAR_COUNT;
 
       for (let i = 0; i < BIG_STAR_COUNT; i++) {
         const team = teams[i];
-        const starGroup = smallStarGroups[i] || [];
-        const bigStar = bigStarEls[i];
+        const star = stars[i];
+        if (!team || !star) continue;
 
-        if (!team || !bigStar) {
-          starGroup.forEach((el) => el.classList.remove('on'));
-          if (bigStar) {
-            bigStar.classList.remove('on');
-          }
-          continue;
-        }
-
-        const count = Math.max(0, mode === 'scoring' ? (Number(team.scoreCount) || 0) : (Number(team.count) || 0));
+        const count = Math.max(
+          0,
+          mode === 'scoring'
+            ? (Number(team.scoreCount) || 0)
+            : (Number(team.count) || 0)
+        );
         const target = Math.max(0, Number(team.target) || 0);
+        star.memberCount = count;
+
         totalCount += count;
         totalTarget += target;
 
-        // One person lights one small star (capped to 20 per table).
-        const litSmall = Math.min(count, SMALL_PER_BIG);
-
-        for (let j = 0; j < starGroup.length; j++) {
-          starGroup[j].classList.toggle('on', j < litSmall);
-        }
-
         const completed = target > 0 && count >= target;
-        bigStar.classList.toggle('on', completed);
-        if (completed) {
-          completedTables++;
-        }
-      }
+        if (completed) completedTables++;
 
-      if (completedTables >= BIG_STAR_COUNT) {
-        startFinalSequence();
+        if (completed && !star.completed) {
+          star.completed = true;
+          enqueueStar(star);
+        }
       }
 
       if (totalTarget > 0) {
-        statusEl.textContent = `${totalCount} / ${totalTarget} 人 · 完成 ${completedTables} / ${teams.length} 桌`;
+        statusEl.textContent = `${totalCount} / ${totalTarget} 人 · 完成 ${completedTables} / ${teamCount} 組`;
       } else {
-        statusEl.textContent = `${totalCount} 人 · 完成 ${completedTables} / ${teams.length} 桌`;
+        statusEl.textContent = `${totalCount} 人 · 完成 ${completedTables} / ${teamCount} 組`;
       }
     }
 
@@ -681,10 +811,19 @@
       }
     }
 
-    buildSky();
+    startupBubbleCloseEl.addEventListener('click', () => {
+      startupBubbleEl.classList.add('hidden');
+    });
+
+    window.addEventListener('resize', () => {
+      // 下一幀自動依新尺寸重算
+    });
+
+    ensureStars();
     applyTeamsProgress([], 'banquet');
+    ensureAnimation();
     fetchState();
-    pollTimer = setInterval(fetchState, 500);
+    pollTimer = setInterval(fetchState, POLL_MS);
   </script>
 </body>
 </html>
