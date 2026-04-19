@@ -50,7 +50,7 @@
       position: absolute;
       width: 0;
       height: 0;
-      transform: translate(-50%, -50%);
+      transform: translate(-50%, -50%) scale(var(--orbit-scale, 1));
       transition: left 4.2s ease, top 4.2s ease;
     }
 
@@ -62,10 +62,10 @@
       position: absolute;
       left: 0;
       top: 0;
-      width: auto;
-      height: auto;
+      width: clamp(120px, 15.5vw, 176px);
+      height: clamp(120px, 15.5vw, 176px);
       transform: translate(-50%, -50%);
-      background: none;
+      background: url('/big_star.png') center center / contain no-repeat;
       border: 0;
       opacity: 0;
       transition: opacity 0.28s ease, transform 0.28s ease;
@@ -73,12 +73,21 @@
       align-items: center;
       justify-content: center;
       text-align: center;
-      padding: 0;
+      padding: 0 14%;
+    }
+
+    .big-star-label {
       color: #fff8cf;
       font-weight: 700;
-      font-size: clamp(1.7rem, 3.8vw, 2.2rem);
+      font-size: clamp(1.05rem, 2.2vw, 1.35rem);
       white-space: nowrap;
       text-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
+      opacity: 1;
+      transition: opacity 2s ease;
+    }
+
+    .sky.orbiting .big-star-label {
+      opacity: 0;
     }
 
     .big-star.on {
@@ -134,8 +143,8 @@
       position: fixed;
       left: 50%;
       top: 50%;
-      width: 34px;
-      height: 34px;
+      width: 52px;
+      height: 52px;
       border-radius: 50%;
       transform: translate(-50%, -50%) scale(0.3);
       opacity: 0;
@@ -310,6 +319,7 @@
     const ORBIT_BASE_SPEED_RAD_PER_SEC = 0.5;
     const ORBIT_MAX_SPEED_RAD_PER_SEC = 6.2;
     const ORBIT_SHRINK_PER_SEC = 50.0;
+    const ORBIT_FINAL_SCALE = 0.5;
     const BURST_COLORS = [
       '#ff5f57', '#ff8f3f', '#ffbe3b', '#e9ef4f', '#9af56b',
       '#4ff2a2', '#33e5d4', '#34c6ff', '#3f9cff', '#4f7dff',
@@ -355,7 +365,10 @@
 
       const big = document.createElement('div');
       big.className = 'big-star';
-      big.textContent = TEAM_NAMES[index] || String(index + 1);
+      const bigLabel = document.createElement('span');
+      bigLabel.className = 'big-star-label';
+      bigLabel.textContent = TEAM_NAMES[index] || String(index + 1);
+      big.appendChild(bigLabel);
       cluster.appendChild(big);
       bigStarEls.push(big);
       const group = [];
@@ -524,12 +537,19 @@
         const radius = Math.max(minRadius, startRadius - elapsedSec * ORBIT_SHRINK_PER_SEC);
         const shrinkRatio = startRadius > 0 ? (1 - (radius / startRadius)) : 1;
         const speedNow = ORBIT_BASE_SPEED_RAD_PER_SEC + ((ORBIT_MAX_SPEED_RAD_PER_SEC - ORBIT_BASE_SPEED_RAD_PER_SEC) * (shrinkRatio * shrinkRatio));
+        const scaleNow = 1 - ((1 - ORBIT_FINAL_SCALE) * shrinkRatio);
         orbitAngleOffset += speedNow * deltaSec;
 
         placeClustersOnCircle(radius, orbitAngleOffset);
+        clusterEls.forEach((cluster) => {
+          cluster.style.setProperty('--orbit-scale', String(scaleNow));
+        });
 
         if (radius <= 0.5) {
           placeClustersOnCircle(0, orbitAngleOffset);
+          clusterEls.forEach((cluster) => {
+            cluster.style.setProperty('--orbit-scale', String(ORBIT_FINAL_SCALE));
+          });
           cancelAnimationFrame(orbitRafId);
           orbitRafId = 0;
           triggerBurstSequence();
