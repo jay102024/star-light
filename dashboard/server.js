@@ -49,6 +49,26 @@ app.get('/test.mp4', (req, res) => {
   });
 });
 
+app.get('/doraemon.mp4', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'doraemon.mp4'), {
+    acceptRanges: false,
+    cacheControl: false,
+    headers: {
+      'Cache-Control': 'no-store'
+    }
+  });
+});
+
+app.get('/God_Can_You_Hear_Me.mp4', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'God_Can_You_Hear_Me.mp4'), {
+    acceptRanges: false,
+    cacheControl: false,
+    headers: {
+      'Cache-Control': 'no-store'
+    }
+  });
+});
+
 app.get('/', (req, res) => {
   res.redirect('/client');
 });
