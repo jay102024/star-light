@@ -4,7 +4,7 @@
 // 手動指定要燒錄的組別 (1-20)。設定後會固定用這組，未設定時自動生成
 // 例如改成 5 就會燒成 team-5 / esp32-table-5
 // 0 表示自動生成（推薦首次開發用）
-#define FIXED_TABLE_NUMBER 10
+#define FIXED_TABLE_NUMBER 6
 
 // 強制清空舊 NVS 資料並重新寫入（覆蓋舊身份）
 // 設定為 1 時，每次開機都會清空舊的 teamId/deviceId 然後重新寫入

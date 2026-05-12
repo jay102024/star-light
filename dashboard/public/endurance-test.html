@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>續航測試</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body class="test-body">
+  <main class="test-shell">
+    <section class="test-hero compact">
+      <p class="site-title">115年度星燈營</p>
+      <p class="eyebrow">Endurance Test</p>
+      <h1>續航測試</h1>
+      <p class="hero-copy">選擇一台目前在線的機器後開始記錄心跳。模式二會先切入計分模式，並每 2 秒模擬偵測到加分一次。</p>
+    </section>
+
+    <section class="test-panel endurance-panel">
+      <article class="brightness-device-panel">
+        <p class="eyebrow">Online Devices</p>
+        <h2>在線機器</h2>
+        <div id="enduranceDeviceList" class="brightness-device-list"></div>
+      </article>
+
+      <article class="night-sky-card">
+        <p class="eyebrow">Mode</p>
+        <h2>測試模式</h2>
+        <div class="endurance-mode-grid">
+          <label class="endurance-mode-card">
+            <input type="radio" name="enduranceMode" value="heartbeat" checked>
+            <strong>心跳續航</strong>
+            <span>抓第一次心跳和最後一次心跳，輸出續航多久。</span>
+          </label>
+          <label class="endurance-mode-card">
+            <input type="radio" name="enduranceMode" value="scoring">
+            <strong>心跳 + 計分燈效</strong>
+            <span>先切入計分模式，每 2 秒模擬加分一次，輸出亮了幾次與續航多久。</span>
+          </label>
+        </div>
+
+        <div class="night-sky-actions endurance-actions">
+          <button id="enduranceStartButton" class="brand-button" type="button">開始測試</button>
+          <button id="enduranceStopButton" class="danger-button" type="button" disabled>停止並結算</button>
+          <button id="enduranceClearButton" class="ghost-button" type="button">清除結果</button>
+          <a class="ghost-button" href="/test-J2E13412">回測試中心</a>
+        </div>
+      </article>
+
+      <article class="night-sky-card stats-card">
+        <p class="eyebrow">Live Snapshot</p>
+        <h2>測試狀態</h2>
+        <div class="night-sky-stats endurance-stats">
+          <div>
+            <span>狀態</span>
+            <strong id="enduranceStateValue">待命中</strong>
+          </div>
+          <div>
+            <span>第一個心跳</span>
+            <strong id="firstHeartbeatValue">尚未收到</strong>
+          </div>
+          <div>
+            <span>最後心跳</span>
+            <strong id="lastHeartbeatValue">尚未收到</strong>
+          </div>
+          <div>
+            <span>目前續航</span>
+            <strong id="durationValue">00:00:00</strong>
+          </div>
+          <div>
+            <span>亮燈次數</span>
+            <strong id="lightCountValue">0</strong>
+          </div>
+          <div>
+            <span>目前模式</span>
+            <strong id="currentModeValue">未設定</strong>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <p id="enduranceStatus" class="sound-status">選擇一台在線機器後開始測試。</p>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/assets/endurance-test.js"></script>
+</body>
+</html>
