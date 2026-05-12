@@ -381,6 +381,54 @@
   color: var(--brand-deep);
 }
 
+.endurance-panel {
+  grid-template-columns: 1fr;
+}
+
+.endurance-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.endurance-mode-card {
+  min-height: 112px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.72);
+  padding: 12px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 10px;
+  align-content: start;
+  cursor: pointer;
+}
+
+.endurance-mode-card input {
+  margin-top: 3px;
+}
+
+.endurance-mode-card strong,
+.endurance-mode-card span {
+  display: block;
+}
+
+.endurance-mode-card span {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.endurance-actions {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.endurance-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 @media (max-width: 860px) {
   .test-panel,
   .brightness-panel {
@@ -391,7 +439,10 @@
   .sound-form,
   .sound-action-row,
   .night-sky-actions,
-  .night-sky-stats {
+  .night-sky-stats,
+  .endurance-mode-grid,
+  .endurance-actions,
+  .endurance-stats {
     grid-template-columns: 1fr;
   }
 

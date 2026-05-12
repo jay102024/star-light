@@ -97,6 +97,10 @@ app.get('/test-J2E13412/brightness-test', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'brightness-test.html'));
 });
 
+app.get('/test-J2E13412/endurance-test', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'endurance-test.html'));
+});
+
 app.get(`/${ADMIN_PATH_SEGMENT}`, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
