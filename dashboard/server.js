@@ -53,6 +53,10 @@ app.get('/golden_dome.glb', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'golden dome 3d model.glb'));
 });
 
+app.get('/golden_dome.png', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'golden_dome.png'));
+});
+
 app.get('/favicon.ico', (req, res) => {
   res.status(204).end();
 });

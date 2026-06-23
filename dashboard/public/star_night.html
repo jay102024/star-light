@@ -4,14 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Star Night</title>
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
-    }
-  }
-  </script>
   <style>
     :root {
       color-scheme: dark;
@@ -29,13 +21,17 @@
       color: #e6f0ff;
     }
 
-    #dome-canvas {
+    #dome-img {
       position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100%;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      height: clamp(220px, 40vh, 460px);
+      width: auto;
       z-index: 0;
       pointer-events: none;
+      user-select: none;
+      object-fit: contain;
     }
 
     .sky {
@@ -72,9 +68,7 @@
     .big-star-label {
       color: #fffdf3;
       font-weight: 800;
-      font-size: clamp(1.08rem, 2.15vw, 1.42rem);
       letter-spacing: 0.02em;
-      white-space: nowrap;
       text-shadow:
         0 1px 0 rgba(72, 38, 0, 0.9),
         0 0 6px rgba(59, 22, 0, 0.72),
@@ -82,6 +76,20 @@
         0 0 18px rgba(255, 252, 225, 0.32);
       pointer-events: none;
       user-select: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      line-height: 1.2;
+    }
+
+    .big-star-num {
+      font-size: clamp(0.8rem, 1.55vw, 1.05rem);
+      opacity: 0.88;
+    }
+
+    .big-star-name {
+      font-size: clamp(1.0rem, 1.9vw, 1.28rem);
+      white-space: nowrap;
     }
 
     .status {
@@ -180,7 +188,7 @@
   </style>
 </head>
 <body>
-  <canvas id="dome-canvas"></canvas>
+  <img id="dome-img" src="/golden_dome.png" alt="" />
   <main id="sky" class="sky"></main>
   <video id="endingVideo" class="ending-video" playsinline preload="auto" src="/God_Can_You_Hear_Me.mp4"></video>
   <div id="status" class="status">0 / 400 人</div>
@@ -195,12 +203,16 @@
   <script>
     const BIG_STAR_COUNT = 30;
     const TEAM_NAMES = [
-      '恭敬', '慈悲', '和睦', '真誠', '布施',
-      '持戒', '忍辱', '精進', '禪定', '智慧',
-      '福德', '教理', '觀音', '文殊', '地藏',
-      '普賢', '信心', '感恩', '菩提', '中道',
-      '願力', '善念', '法喜', '清淨', '正念',
-      '光明', '安定', '歡喜', '自在', '圓滿'
+      '恭敬', '恭敬', '恭敬',
+      '慈悲', '慈悲', '慈悲',
+      '和睦', '和睦', '和睦',
+      '真誠', '真誠', '真誠',
+      '布施', '布施', '布施',
+      '持戒', '持戒', '持戒',
+      '忍辱', '忍辱', '忍辱',
+      '精進', '精進', '精進',
+      '禪定', '禪定', '禪定',
+      '智慧', '智慧', '智慧'
     ];
 
     const CENTER_HOLD_MIN_MS    = 1000;
@@ -352,9 +364,18 @@
       el.className = 'big-star';
 
       const label = document.createElement('span');
-      label.className   = 'big-star-label';
-      label.textContent = TEAM_NAMES[index] || String(index + 1);
+      label.className = 'big-star-label';
 
+      const numSpan = document.createElement('span');
+      numSpan.className   = 'big-star-num';
+      numSpan.textContent = String(index + 1);
+
+      const nameSpan = document.createElement('span');
+      nameSpan.className   = 'big-star-name';
+      nameSpan.textContent = TEAM_NAMES[index] || String(index + 1);
+
+      label.appendChild(numSpan);
+      label.appendChild(nameSpan);
       el.appendChild(label);
       skyEl.appendChild(el);
       return el;
@@ -619,106 +640,5 @@
     pollTimer = setInterval(fetchState, POLL_MS);
   </script>
 
-  <!-- ─── Three.js 金頂渲染 ─────────────────────────────────────────────── -->
-  <script type="module">
-    import * as THREE from 'three';
-    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-
-    const DOME_GLB  = '/golden_dome.glb';
-    const DOME_SIZE = 2.4;
-
-    // ── Renderer（像素比固定 1，省效能）────────────────────────────────────
-    const canvas   = document.getElementById('dome-canvas');
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    renderer.setPixelRatio(1);
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.outputColorSpace  = THREE.SRGBColorSpace;
-    renderer.toneMapping       = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
-
-    // ── Scene & Camera（正面，不偏移）──────────────────────────────────────
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x00030c);
-
-    const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 300);
-    camera.position.set(0, 0.2, 5.0);
-    camera.lookAt(0, 0.2, 0);
-
-    // ── Lighting（強補光讓金色顯色）────────────────────────────────────────
-    scene.add(new THREE.AmbientLight(0xfff8e8, 2.2));
-
-    const key = new THREE.DirectionalLight(0xfff0c0, 3.5);
-    key.position.set(2, 5, 6);
-    scene.add(key);
-
-    const fill = new THREE.DirectionalLight(0xffe090, 1.8);
-    fill.position.set(-3, 2, 4);
-    scene.add(fill);
-
-    // ── 背景星粒子（1 500 顆，靜態）────────────────────────────────────────
-    (function () {
-      const N   = 1500;
-      const pos = new Float32Array(N * 3);
-      for (let i = 0; i < N; i++) {
-        const theta = Math.random() * Math.PI * 2;
-        const phi   = Math.acos(2 * Math.random() - 1);
-        const r     = 60 + Math.random() * 120;
-        pos[i*3]   = r * Math.sin(phi) * Math.cos(theta);
-        pos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
-        pos[i*3+2] = r * Math.cos(phi);
-      }
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-      scene.add(new THREE.Points(geo, new THREE.PointsMaterial({
-        color: 0xffffff, size: 0.28, sizeAttenuation: true,
-        transparent: true, opacity: 0.80,
-      })));
-    }());
-
-    // ── 置中縮放（保留原始材質）────────────────────────────────────────────
-    function centerAndScale(obj) {
-      obj.updateMatrixWorld(true);
-      const box  = new THREE.Box3().setFromObject(obj);
-      const size = box.getSize(new THREE.Vector3());
-      const s    = DOME_SIZE / Math.max(size.x, size.y, size.z);
-      obj.scale.setScalar(s);
-      obj.updateMatrixWorld(true);
-      const center = new THREE.Box3().setFromObject(obj).getCenter(new THREE.Vector3());
-      obj.position.sub(center);
-    }
-
-    // ── 靜態渲染（只在需要時渲染，不持續跑 RAF）────────────────────────────
-    let dirty = true;
-    function markDirty() { dirty = true; }
-    function renderLoop() {
-      requestAnimationFrame(renderLoop);
-      if (!dirty) return;
-      dirty = false;
-      renderer.render(scene, camera);
-    }
-    renderLoop();
-
-    // ── 載入 GLB ───────────────────────────────────────────────────────────
-    new GLTFLoader().load(
-      DOME_GLB,
-      gltf => {
-        gltf.scene.rotation.y = Math.PI / 2;
-        centerAndScale(gltf.scene);
-        scene.add(gltf.scene);
-        markDirty();
-      },
-      undefined,
-      err => console.warn('[StarNight] GLB 載入失敗:', err.message ?? err)
-    );
-
-    // ── Resize ─────────────────────────────────────────────────────────────
-    window.addEventListener('resize', () => {
-      const w = window.innerWidth, h = window.innerHeight;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
-      markDirty();
-    });
-  </script>
 </body>
 </html>
