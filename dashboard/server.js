@@ -3,14 +3,28 @@ const fs = require('fs/promises');
 const http = require('http');
 const path = require('path');
 const { Server } = require('socket.io');
+require('dotenv').config();
+const mysql = require('mysql2/promise');
 
 const PORT = Number(process.env.PORT || 3000);
 const ADMIN_PATH_SEGMENT = process.env.ADMIN_PATH_SEGMENT || 'admin-J2E13412';
-const DEFAULT_TEAM_COUNT = Number(process.env.DEFAULT_TEAM_COUNT || 20);
+const DEFAULT_TEAM_COUNT = Number(process.env.DEFAULT_TEAM_COUNT || 30);
 const DEVICE_TIMEOUT_MS = Number(process.env.DEVICE_TIMEOUT_MS || 15000);
 const CLIENT_TIMEOUT_MS = Number(process.env.CLIENT_TIMEOUT_MS || 60000);
 const DATA_DIR = path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'state.json');
+
+// MySQL 連接池
+const pool = mysql.createPool({
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'counter_user',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'starlight_db',
+  port: process.env.DB_PORT || 3306,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+});
 
 const app = express();
 const server = http.createServer(app);
@@ -33,6 +47,10 @@ app.get('/big_star.png', (req, res) => {
 
 app.get('/small_star.png', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'small_star.png'));
+});
+
+app.get('/golden_dome.glb', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'golden dome 3d model.glb'));
 });
 
 app.get('/favicon.ico', (req, res) => {
@@ -357,19 +375,115 @@ function createDefaultState() {
   };
 }
 
+async function loadStateFromDB() {
+  const conn = await pool.getConnection();
+  try {
+    await ensureDatabaseSchema(conn);
+
+    const [rows] = await conn.query('SELECT mode, updated_at FROM global_state WHERE id = 1');
+    const [teamRows] = await conn.query('SELECT * FROM teams ORDER BY id');
+    
+    const state = createDefaultState();
+    if (rows && rows.length > 0) {
+      state.mode = rows[0].mode || null;
+    }
+    
+    if (teamRows && teamRows.length > 0) {
+      state.teams = teamRows.map(row => ({
+        id: row.id,
+        name: row.name,
+        count: row.count,
+        scoreCount: row.score_count,
+        target: row.target,
+        testLightSeq: row.test_light_seq,
+        testLightMode: row.test_light_mode,
+        testLightColorIndex: row.test_light_color_index,
+        testLightBrightness: row.test_light_brightness,
+        testLightFinalMin: row.test_light_final_min,
+        testLightFinalMax: row.test_light_final_max,
+        testLightFinalPeriodMs: row.test_light_final_period_ms,
+        deviceId: row.device_id || '',
+        deviceLastSeenAt: row.device_last_seen_at,
+        clientLastSeenAt: row.client_last_seen_at,
+        updatedAt: row.updated_at
+      }));
+    }
+    
+    return state;
+  } finally {
+    conn.release();
+  }
+}
+
+async function ensureDatabaseSchema(conn) {
+  await conn.query(`
+    CREATE TABLE IF NOT EXISTS global_state (
+      id INT PRIMARY KEY,
+      mode VARCHAR(20) NULL,
+      updated_at BIGINT NOT NULL DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await conn.query(`
+    CREATE TABLE IF NOT EXISTS teams (
+      id VARCHAR(50) PRIMARY KEY,
+      name VARCHAR(100) NOT NULL,
+      count INT NOT NULL DEFAULT 0,
+      score_count INT NOT NULL DEFAULT 0,
+      target INT NOT NULL DEFAULT 0,
+      test_light_seq INT NOT NULL DEFAULT 0,
+      test_light_mode VARCHAR(20) NOT NULL DEFAULT 'classic',
+      test_light_color_index INT NOT NULL DEFAULT 0,
+      test_light_brightness INT NOT NULL DEFAULT 220,
+      test_light_final_min INT NOT NULL DEFAULT 10,
+      test_light_final_max INT NOT NULL DEFAULT 255,
+      test_light_final_period_ms INT NOT NULL DEFAULT 9000,
+      device_id VARCHAR(100) NOT NULL DEFAULT '',
+      device_last_seen_at BIGINT NOT NULL DEFAULT 0,
+      client_last_seen_at BIGINT NOT NULL DEFAULT 0,
+      updated_at BIGINT NOT NULL DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_updated_at (updated_at)
+    )
+  `);
+
+  await conn.query(
+    `INSERT INTO global_state (id, mode, updated_at)
+     VALUES (1, NULL, ?)
+     ON DUPLICATE KEY UPDATE id = id`,
+    [Date.now()]
+  );
+
+  const now = Date.now();
+  const defaults = createDefaultState();
+  for (const team of defaults.teams) {
+    await conn.query(
+      `INSERT INTO teams (
+        id, name, count, score_count, target,
+        test_light_seq, test_light_mode, test_light_color_index,
+        test_light_brightness, test_light_final_min, test_light_final_max,
+        test_light_final_period_ms, device_id, device_last_seen_at,
+        client_last_seen_at, updated_at
+      ) VALUES (?, ?, 0, 0, 0, 0, 'classic', 0, 220, 10, 255, 9000, '', 0, 0, ?)
+      ON DUPLICATE KEY UPDATE id = id`,
+      [team.id, team.name, now]
+    );
+  }
+}
+
 async function loadState() {
   try {
-    const raw = await fs.readFile(DATA_FILE, 'utf8');
-    const parsed = JSON.parse(raw);
-    return normalizeState(parsed);
+    return await loadStateFromDB();
   } catch (error) {
-    if (error.code !== 'ENOENT') {
-      console.warn('Failed to load persisted state, using defaults.');
-      console.warn(error);
-    }
-
+    console.warn('Failed to load state from database, using defaults.');
+    console.warn(error);
     const initial = createDefaultState();
-    await persistState(initial);
+    try {
+      await persistState(initial);
+    } catch (persistError) {
+      console.warn('Also failed to persist defaults to database.');
+    }
     return initial;
   }
 }
@@ -530,7 +644,71 @@ function schedulePersist() {
   }, 150);
 }
 
+async function persistStateToDB(nextState) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    await ensureDatabaseSchema(conn);
+    
+    // 更新全局狀態
+    await conn.query(
+      `INSERT INTO global_state (id, mode, updated_at)
+       VALUES (1, ?, ?)
+       ON DUPLICATE KEY UPDATE mode = VALUES(mode), updated_at = VALUES(updated_at)`,
+      [nextState.mode, Date.now()]
+    );
+    
+    // 更新團隊
+    for (const team of nextState.teams) {
+      await conn.query(
+        `INSERT INTO teams (
+          id, name, count, score_count, target,
+          test_light_seq, test_light_mode, test_light_color_index,
+          test_light_brightness, test_light_final_min, test_light_final_max,
+          test_light_final_period_ms, device_id, device_last_seen_at,
+          client_last_seen_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          name = VALUES(name),
+          count = VALUES(count),
+          score_count = VALUES(score_count),
+          target = VALUES(target),
+          test_light_seq = VALUES(test_light_seq),
+          test_light_mode = VALUES(test_light_mode),
+          test_light_color_index = VALUES(test_light_color_index),
+          test_light_brightness = VALUES(test_light_brightness),
+          test_light_final_min = VALUES(test_light_final_min),
+          test_light_final_max = VALUES(test_light_final_max),
+          test_light_final_period_ms = VALUES(test_light_final_period_ms),
+          device_id = VALUES(device_id),
+          device_last_seen_at = VALUES(device_last_seen_at),
+          client_last_seen_at = VALUES(client_last_seen_at),
+          updated_at = VALUES(updated_at)`,
+        [
+          team.id, team.name, team.count, team.scoreCount, team.target,
+          team.testLightSeq, team.testLightMode, team.testLightColorIndex,
+          team.testLightBrightness, team.testLightFinalMin, team.testLightFinalMax,
+          team.testLightFinalPeriodMs, team.deviceId, team.deviceLastSeenAt,
+          team.clientLastSeenAt, team.updatedAt
+        ]
+      );
+    }
+    
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
+
 async function persistState(nextState) {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(DATA_FILE, JSON.stringify(nextState, null, 2), 'utf8');
+  try {
+    await persistStateToDB(nextState);
+  } catch (error) {
+    console.error('Failed to persist state to database');
+    console.error(error);
+  }
 }

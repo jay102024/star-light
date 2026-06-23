@@ -1,0 +1,6 @@
+
+> star-counter-dashboard@1.0.0 start
+> node server.js
+
+Dashboard server running at http://localhost:3000/client
+Hidden admin route: http://localhost:3000/admin-J2E13412

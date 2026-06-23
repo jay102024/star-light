@@ -1,15 +1,15 @@
 #include "nvram.h"
 #include <Preferences.h>
 
-// 手動指定要燒錄的組別 (1-20)。設定後會固定用這組，未設定時自動生成
+// 手動指定要燒錄的組別 (1-30)。設定後會固定用這組，未設定時自動生成
 // 例如改成 5 就會燒成 team-5 / esp32-table-5
 // 0 表示自動生成（推薦首次開發用）
-#define FIXED_TABLE_NUMBER 6
+#define FIXED_TABLE_NUMBER 30
 
 // 強制清空舊 NVS 資料並重新寫入（覆蓋舊身份）
 // 設定為 1 時，每次開機都會清空舊的 teamId/deviceId 然後重新寫入
 // 用完記得改回 0，否則每次重啟都會重寫（浪費 flash）
-#define FORCE_RESET_NVRAM 0
+#define FORCE_RESET_NVRAM 1
 
 // 全域身份變數
 String teamId;
@@ -33,7 +33,7 @@ void initNvram() {
 
   int tableNumber = 0;
   
-  #if FIXED_TABLE_NUMBER > 0 && FIXED_TABLE_NUMBER <= 20
+  #if FIXED_TABLE_NUMBER > 0 && FIXED_TABLE_NUMBER <= 30
     // 編譯時指定了固定組別
     tableNumber = FIXED_TABLE_NUMBER;
     Serial.print("Using fixed table number: ");
@@ -42,7 +42,7 @@ void initNvram() {
     // 自動生成：基於 MAC 地址
     const uint64_t mac = ESP.getEfuseMac();
     const uint32_t macLow = static_cast<uint32_t>(mac & 0xFFFFFFFFULL);
-    tableNumber = static_cast<int>(macLow % 20UL) + 1;  // 1..20
+    tableNumber = static_cast<int>(macLow % 30UL) + 1;  // 1..30
     Serial.print("Auto-generated table number from MAC: ");
     Serial.println(tableNumber);
   #endif

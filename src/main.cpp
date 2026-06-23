@@ -482,7 +482,7 @@ const char STAR_NIGHT_HTML[] PROGMEM = R"rawliteral(
   <div id="status" class="status">0 / 400 人</div>
 
   <script>
-    const BIG_STAR_COUNT = 20;
+    const BIG_STAR_COUNT = 30;
     const SMALL_PER_BIG = 20;
     const TOTAL_SMALL = BIG_STAR_COUNT * SMALL_PER_BIG;
 

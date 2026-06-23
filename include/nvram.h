@@ -18,7 +18,7 @@ extern String deviceId;
 // 2. FIXED_TABLE_NUMBER：指定燒錄的組別
 //    #define FIXED_TABLE_NUMBER 0  → 自動生成（推薦新板子首次用）
 //    #define FIXED_TABLE_NUMBER 5  → 強制燒 team-5 / esp32-table-5
-//    #define FIXED_TABLE_NUMBER 20 → 強制燒 team-20 / esp32-table-20
+//    #define FIXED_TABLE_NUMBER 30 → 強制燒 team-30 / esp32-table-30
 //
 // 例如要覆蓋舊的 team-17：
 //   1. 改 FIXED_TABLE_NUMBER 為你想要的號碼（如 3）

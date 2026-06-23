@@ -151,12 +151,12 @@ npm start
 
 如果一直維持 `FORCE_RESET_NVRAM = 1`，每次重開機都會重寫快閃記憶體，長期會增加損耗。
 
-#### 20 片板子快速對照
+#### 30 片板子快速對照
 
 - 第 1 桌：`FIXED_TABLE_NUMBER = 1`
 - 第 2 桌：`FIXED_TABLE_NUMBER = 2`
 - ...
-- 第 20 桌：`FIXED_TABLE_NUMBER = 20`
+- 第 30 桌：`FIXED_TABLE_NUMBER = 30`
 
 身份會自動變成：
 
