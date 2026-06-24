@@ -1,5 +1,6 @@
 const nightSkyToggleButton = document.getElementById('nightSkyToggleButton');
 const nightSkyResetButton = document.getElementById('nightSkyResetButton');
+const nightSkySetTargetButton = document.getElementById('nightSkySetTargetButton');
 const nightSkyModeValue = document.getElementById('nightSkyModeValue');
 const nightSkyCountValue = document.getElementById('nightSkyCountValue');
 const nightSkyCompletedValue = document.getElementById('nightSkyCompletedValue');
@@ -13,6 +14,7 @@ bootstrap();
 
 nightSkyToggleButton.addEventListener('click', toggleNightSkyTest);
 nightSkyResetButton.addEventListener('click', resetAllCounts);
+nightSkySetTargetButton.addEventListener('click', setAllTargets);
 
 async function bootstrap() {
   const response = await fetch('/api/bootstrap');
@@ -68,6 +70,33 @@ async function resetAllCounts() {
   const response = await fetch('/api/admin/reset-all', { method: 'POST' });
   if (!response.ok) {
     throw new Error('Reset all failed');
+  }
+}
+
+async function setAllTargets() {
+  const confirmed = window.confirm('要將所有組別的目標人數設為 10 嗎？');
+  if (!confirmed) {
+    return;
+  }
+
+  nightSkySetTargetButton.disabled = true;
+  try {
+    const snapshot = [...teams];
+    for (const team of snapshot) {
+      const response = await fetch(`/api/teams/${team.id}/target`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target: 10 })
+      });
+      if (!response.ok) {
+        throw new Error(`Set target failed for ${team.id}`);
+      }
+    }
+  } catch (error) {
+    console.error(error);
+    window.alert('設定目標失敗，請稍後再試。');
+  } finally {
+    nightSkySetTargetButton.disabled = false;
   }
 }
 
